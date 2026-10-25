@@ -1,5 +1,5 @@
 """
-Riley's Image Studio v2.3
+Riley's Image Studio v2.4
 A private image generator that runs only on this PC (address 127.0.0.1 = this computer only).
 Engine: FLUX.1 Schnell (open weights, Apache-2.0). Trains your own character models (LoRA).
 """
@@ -22,7 +22,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "2.3"
+VERSION = "2.4"
 APP_DIR = Path(__file__).resolve().parent
 MODELS_DIR = APP_DIR / "models"
 IMAGES_DIR = APP_DIR / "My Images"
@@ -32,6 +32,10 @@ HISTORY_FILE = IMAGES_DIR / "history.jsonl"
 OUTFITS_DIR = APP_DIR / "Outfits"
 SCENES_DIR = APP_DIR / "Scenes"
 CHARS_FILE = APP_DIR / "Characters" / "characters.json"
+QUEUE_FILE = APP_DIR / "queue.json"
+FAVS_FILE = APP_DIR / "favorites.json"
+SETTINGS_FILE = APP_DIR / "settings.json"
+LAST_ACTIVITY = {"t": time.time()}
 LOG_FILE = APP_DIR / "studio_log.txt"
 BASE_MODEL = MODELS_DIR / "flux-schnell"
 PACKED_TRANSFORMER = MODELS_DIR / "flux-schnell-transformer-nf4"
@@ -430,6 +434,7 @@ def status():
 
 @app.post("/api/generate")
 def generate(req: GenRequest):
+    LAST_ACTIVITY["t"] = time.time()
     if STATE["status"] != "ready":
         raise HTTPException(503, STATE["message"])
     prompt = " ".join((req.prompt or "").split())[:1500]
@@ -657,7 +662,9 @@ def project(slug: str):
             w = h = 0
         imgs.append({"file": f.name, "caption": caps.get(f.name, ""), "w": w, "h": h})
     return {"slug": slug, "name": meta.get("name"), "word": meta.get("word"), "images": imgs,
-            "progress": read_json(p / "progress.json", None)}
+            "progress": read_json(p / "progress.json", None),
+            "learn_from_favorites": bool(meta.get("learn_from_favorites")), "pending_favorites": pending_favorites(slug),
+            "has_model": (MYMODELS_DIR / f"{slug}.safetensors").exists(), "credits": len(read_json(p / "credits.json", []))}
 
 
 class ImageUpload(BaseModel):
@@ -744,6 +751,23 @@ class StartReq(BaseModel):
 
 @app.post("/api/train/projects/{slug}/start")
 def start_training(slug: str, req: StartReq):
+    LAST_ACTIVITY["t"] = time.time()
+    return begin_training(slug, req.length, source="manual")
+
+
+def keep_previous_model(slug: str) -> None:
+    """Before retraining, keep the current model as '<name> (previous)' so a bad run never loses a good model."""
+    cur = MYMODELS_DIR / f"{slug}.safetensors"
+    if not cur.exists() or slug.endswith("-previous"):
+        return
+    meta = read_json(cur.with_suffix(".json"), {})
+    shutil.copy2(cur, MYMODELS_DIR / f"{slug}-previous.safetensors")
+    meta["name"] = f"{meta.get('name', slug)} (previous)"
+    write_json(MYMODELS_DIR / f"{slug}-previous.json", meta)
+    LOADED_LORAS.discard(lora_name(f"{slug}-previous"))
+
+
+def begin_training(slug: str, length: str, source: str = "manual"):
     p = project_dir(slug)
     if TRAIN["proc"] is not None and TRAIN["proc"].poll() is None:
         raise HTTPException(409, "Another model is already training.")
@@ -752,16 +776,20 @@ def start_training(slug: str, req: StartReq):
         raise HTTPException(400, f"Add at least 5 pictures first (you have {n}). 15–40 works best.")
     if STATE["status"] == "loading":
         raise HTTPException(409, "Wait for the engine to finish loading, then try again.")
-    steps = LENGTHS.get(req.length, LENGTHS["standard"])
+    if STATE["status"] == "busy":
+        raise HTTPException(409, "Wait for the current job to finish, then try again.")
+    steps = LENGTHS.get(length, LENGTHS["standard"])
     meta = read_json(p / "project.json", {})
     for f in ("control.txt", "progress.json"):
         (p / f).unlink(missing_ok=True)
     for old in (p / "samples").glob("*.png"):
         old.unlink(missing_ok=True)
 
+    try:
+        keep_previous_model(slug)
+    except Exception:
+        log("Couldn't keep a copy of the previous model:\n" + traceback.format_exc())
     unload_engine()
-    if STATE["status"] == "busy":
-        raise HTTPException(409, "Wait for the current job to finish, then try again.")
     STATE.update(status="training", message=f"Training “{meta.get('name', slug)}”. Making pictures is paused until it finishes.", mode="")
     cmd = [sys.executable, str(APP_DIR / "trainer.py"), "--project", str(p), "--steps", str(steps),
            "--out", str(MYMODELS_DIR / f"{slug}.safetensors")]
@@ -784,6 +812,8 @@ def start_training(slug: str, req: StartReq):
             write_json(p / "progress.json", prog)
         log(f"Training finished: {slug} → {prog.get('status')}")
         TRAIN["proc"], TRAIN["slug"] = None, None
+        if source == "queue":
+            queue_record(slug, meta.get("name", slug), length, prog)
         load_engine()
 
     threading.Thread(target=watch, args=(TRAIN["proc"], lf), daemon=True).start()
@@ -853,6 +883,7 @@ def scene_file(name: str):
 @app.post("/api/scene")
 def scene(req: SceneReq):
     from PIL import ImageFilter
+    LAST_ACTIVITY["t"] = time.time()
     if STATE["status"] != "ready":
         raise HTTPException(503, STATE["message"])
     prompt = " ".join((req.prompt or "").split())[:1500]
@@ -955,6 +986,7 @@ class ReadReq(BaseModel):
 
 @app.post("/api/outfits/read")
 def outfit_read(req: ReadReq):
+    LAST_ACTIVITY["t"] = time.time()
     if STATE["status"] == "training":
         raise HTTPException(409, "Copying an outfit is paused while a model is training.")
     if STATE["status"] != "ready":
@@ -1146,6 +1178,382 @@ def train_from_gallery(slug: str, req: FilesReq):
     return {"added": added}
 
 
+
+# ================================================================ overnight queue
+QUEUE_LOCK = threading.Lock()
+
+
+def queue_load() -> dict:
+    q = read_json(QUEUE_FILE, {}) or {}
+    q.setdefault("items", [])            # [{"slug", "length", "reason"}]
+    q.setdefault("start_at", None)       # ISO time the queue may start, or None = not scheduled
+    q.setdefault("results", [])          # finished runs, newest first
+    q.setdefault("running", False)
+    return q
+
+
+def queue_save(q: dict) -> None:
+    q["results"] = q["results"][:50]
+    write_json(QUEUE_FILE, q)
+
+
+def queue_record(slug, name, length, prog):
+    with QUEUE_LOCK:
+        q = queue_load()
+        samples = (prog.get("samples") or [])
+        q["results"].insert(0, {"slug": slug, "name": name, "length": length, "status": prog.get("status"),
+                                "message": prog.get("message", ""), "step": prog.get("step"),
+                                "sample": (samples[-1]["files"][0] if samples and samples[-1].get("files") else ""),
+                                "finished": datetime.now().isoformat(timespec="seconds"), "seen": False})
+        queue_save(q)
+
+
+class QueueAdd(BaseModel):
+    slug: str
+    length: str = "standard"
+
+
+@app.get("/api/queue")
+def queue_get():
+    q = queue_load()
+    names = {pr["slug"]: pr["name"] for pr in projects()}
+    for it in q["items"]:
+        it["name"] = names.get(it["slug"], it["slug"])
+    q["idle_minutes"] = round((time.time() - LAST_ACTIVITY["t"]) / 60, 1)
+    return q
+
+
+@app.post("/api/queue/add")
+def queue_add(req: QueueAdd):
+    p = project_dir(req.slug)
+    n = len(list((p / "images").glob("*.png")))
+    if n < 5:
+        raise HTTPException(400, f"Add at least 5 pictures first (you have {n}).")
+    with QUEUE_LOCK:
+        q = queue_load()
+        q["items"] = [i for i in q["items"] if i["slug"] != req.slug]
+        q["items"].append({"slug": req.slug, "length": req.length if req.length in LENGTHS else "standard", "reason": "you added it"})
+        queue_save(q)
+    return {"ok": True}
+
+
+class QueueOrder(BaseModel):
+    slugs: list[str]
+
+
+@app.post("/api/queue/order")
+def queue_order(req: QueueOrder):
+    with QUEUE_LOCK:
+        q = queue_load()
+        by = {i["slug"]: i for i in q["items"]}
+        q["items"] = [by[s] for s in req.slugs if s in by]
+        queue_save(q)
+    return {"ok": True}
+
+
+class QueueSchedule(BaseModel):
+    mode: str            # "time" | "now" | "off"
+    time: str = ""       # "HH:MM" for mode=time
+
+
+@app.post("/api/queue/schedule")
+def queue_schedule(req: QueueSchedule):
+    with QUEUE_LOCK:
+        q = queue_load()
+        if req.mode == "off":
+            q["start_at"], q["running"] = None, False
+        elif req.mode == "now":
+            q["start_at"] = datetime.now().isoformat(timespec="seconds")
+            q["now"] = True
+        else:
+            m = re.fullmatch(r"(\d{1,2}):(\d{2})", req.time or "")
+            if not m or int(m[1]) > 23 or int(m[2]) > 59:
+                raise HTTPException(400, "Pick a start time.")
+            now = datetime.now()
+            at = now.replace(hour=int(m[1]), minute=int(m[2]), second=0, microsecond=0)
+            if at <= now:
+                from datetime import timedelta
+                at += timedelta(days=1)
+            q["start_at"], q["now"] = at.isoformat(timespec="seconds"), False
+        queue_save(q)
+    return queue_get()
+
+
+@app.post("/api/queue/seen")
+def queue_seen():
+    with QUEUE_LOCK:
+        q = queue_load()
+        for r in q["results"]:
+            r["seen"] = True
+        queue_save(q)
+    return {"ok": True}
+
+
+IDLE_NEEDED = float(os.environ.get("IMAGE_STUDIO_IDLE_MIN", "10")) * 60
+
+
+def queue_tick():
+    """Start the next queued project when it's time, nothing else is running, and you've been idle."""
+    with QUEUE_LOCK:
+        q = queue_load()
+        if not q["items"]:
+            if q["running"] or q["start_at"]:
+                q["running"], q["start_at"], q["now"] = False, None, False
+                queue_save(q)
+            return
+        if TRAIN["proc"] is not None or STATE["status"] != "ready":
+            return
+        if not q["running"]:
+            if not q["start_at"] or datetime.now() < datetime.fromisoformat(q["start_at"]):
+                return
+            if not q.get("now") and time.time() - LAST_ACTIVITY["t"] < IDLE_NEEDED:
+                return                                 # you're using the app; wait until you've been away a while
+            q["running"] = True
+        item = q["items"].pop(0)
+        queue_save(q)
+    try:
+        log(f"Queue: starting {item['slug']} ({item['reason']})")
+        begin_training(item["slug"], item["length"], source="queue")
+    except HTTPException as e:
+        queue_record(item["slug"], item["slug"], item["length"], {"status": "error", "message": e.detail})
+    except Exception:
+        log("Queue start failed:\n" + traceback.format_exc())
+        queue_record(item["slug"], item["slug"], item["length"], {"status": "error", "message": "Couldn't start. Send studio_log.txt to Claude."})
+
+
+# ================================================================ favorites
+FAV_TRIGGER = 20
+
+
+def favs_load() -> dict:
+    return read_json(FAVS_FILE, {}) or {}
+
+
+class FavReq(BaseModel):
+    file: str
+    on: bool
+
+
+@app.get("/api/favorites")
+def favorites():
+    return favs_load()
+
+
+@app.post("/api/favorites")
+def favorite_set(req: FavReq):
+    name = safe_name(req.file)
+    with FILE_LOCK:
+        favs = favs_load()
+        if req.on:
+            rec = next((r for r in read_history() if r["file"] == name), {})
+            favs[name] = {"model": rec.get("model", ""), "starred": datetime.now().isoformat(timespec="seconds"), "used": False}
+        else:
+            favs.pop(name, None)
+        write_json(FAVS_FILE, favs)
+    check_favorite_retrains()
+    return {"ok": True}
+
+
+class FavLearn(BaseModel):
+    on: bool
+
+
+@app.post("/api/train/projects/{slug}/learn-favorites")
+def learn_favorites(slug: str, req: FavLearn):
+    p = project_dir(slug)
+    with FILE_LOCK:
+        meta = read_json(p / "project.json", {})
+        meta["learn_from_favorites"] = bool(req.on)
+        write_json(p / "project.json", meta)
+    check_favorite_retrains()
+    return {"ok": True, "pending": pending_favorites(slug)}
+
+
+def pending_favorites(slug: str) -> int:
+    return sum(1 for f, v in favs_load().items() if v.get("model") == slug and not v.get("used") and (IMAGES_DIR / f).exists())
+
+
+def check_favorite_retrains() -> None:
+    """When a 'learn from favorites' project has 20 new starred pictures, copy them in and queue an overnight retrain."""
+    for pr in projects():
+        slug = pr["slug"]
+        p = TRAIN_DIR / slug
+        meta = read_json(p / "project.json", {})
+        if not meta.get("learn_from_favorites") or pending_favorites(slug) < FAV_TRIGGER:
+            continue
+        with QUEUE_LOCK:
+            q = queue_load()
+            if any(i["slug"] == slug for i in q["items"]) or TRAIN["slug"] == slug:
+                continue
+        with FILE_LOCK:
+            favs = favs_load()
+            files = [f for f, v in favs.items() if v.get("model") == slug and not v.get("used") and (IMAGES_DIR / f).exists()]
+            for f in files:
+                img = Image.open(IMAGES_DIR / f).convert("RGB")
+                i = 1
+                while (p / "images" / f"fav_{i:02d}.png").exists():
+                    i += 1
+                img.save(p / "images" / f"fav_{i:02d}.png")
+                favs[f]["used"] = True
+            write_json(FAVS_FILE, favs)
+        with QUEUE_LOCK:
+            q = queue_load()
+            q["items"].append({"slug": slug, "length": "standard", "reason": f"{len(files)} new favorites"})
+            if not q["start_at"]:
+                from datetime import timedelta
+                at = (datetime.now() + timedelta(days=1)).replace(hour=1, minute=0, second=0, microsecond=0)
+                if datetime.now().hour < 1:
+                    at -= timedelta(days=1)
+                q["start_at"], q["now"] = at.isoformat(timespec="seconds"), False
+            queue_save(q)
+        log(f"Favorites: queued {slug} with {len(files)} new pictures")
+
+
+# ================================================================ find training pictures (Openverse)
+OPENVERSE = os.environ.get("IMAGE_STUDIO_OPENVERSE", "https://api.openverse.org/v1/images/")
+UA = {"User-Agent": f"ImageStudio/{VERSION} (personal offline app)"}
+
+
+def http_get(url: str, timeout: int = 20) -> bytes:
+    import urllib.request
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+@app.get("/api/openverse/search")
+def openverse_search(q: str, page: int = 1):
+    import urllib.parse
+    import urllib.error
+    q = " ".join((q or "").split())[:120]
+    if not q:
+        raise HTTPException(400, "Type what to search for.")
+    params = urllib.parse.urlencode({"q": q, "page": max(1, min(page, 20)), "page_size": 30, "mature": "false",
+                                     "filter_dead": "true", "size": "medium,large"})
+    try:
+        data = json.loads(http_get(f"{OPENVERSE}?{params}"))
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            raise HTTPException(429, "Openverse says to slow down. Wait a few minutes and search again.")
+        raise HTTPException(502, f"Openverse couldn't search right now (error {e.code}).")
+    except Exception:
+        raise HTTPException(502, "Couldn't reach Openverse. Check your internet connection.")
+    out = []
+    for r in data.get("results", []):
+        if r.get("mature"):
+            continue
+        out.append({"id": r.get("id"), "title": (r.get("title") or "")[:120], "creator": (r.get("creator") or "")[:80],
+                    "license": r.get("license", ""), "license_version": r.get("license_version", ""),
+                    "license_url": r.get("license_url", ""), "landing": r.get("foreign_landing_url", ""),
+                    "url": r.get("url", ""), "thumb": r.get("thumbnail") or r.get("url", ""),
+                    "w": r.get("width"), "h": r.get("height"), "source": r.get("source", "")})
+    return {"results": out, "page": page, "pages": data.get("page_count", 1)}
+
+
+class WebAdd(BaseModel):
+    items: list[dict]
+
+
+@app.post("/api/train/projects/{slug}/from-web")
+def train_from_web(slug: str, req: WebAdd):
+    p = project_dir(slug)
+    added, failed = 0, 0
+    credits = read_json(p / "credits.json", [])
+    for it in req.items[:60]:
+        url = str(it.get("url", ""))
+        if not url.startswith(("https://", "http://")):
+            failed += 1
+            continue
+        try:
+            img = Image.open(io.BytesIO(http_get(url, timeout=30)))
+            img.load()
+            img = img.convert("RGB")
+            if min(img.size) < 256:
+                failed += 1
+                continue
+            if max(img.size) > 1536:
+                img.thumbnail((1536, 1536), Image.LANCZOS)
+        except Exception:
+            failed += 1
+            continue
+        i = 1
+        while (p / "images" / f"web_{i:02d}.png").exists():
+            i += 1
+        name = f"web_{i:02d}.png"
+        img.save(p / "images" / name)
+        credits.append({"file": name, "title": it.get("title", ""), "creator": it.get("creator", ""),
+                        "license": f"{it.get('license', '')} {it.get('license_version', '')}".strip(),
+                        "license_url": it.get("license_url", ""), "source": it.get("landing", ""),
+                        "added": datetime.now().isoformat(timespec="seconds")})
+        added += 1
+    write_json(p / "credits.json", credits)
+    return {"added": added, "failed": failed}
+
+
+# ================================================================ settings (start with Windows)
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def autostart_get() -> bool:
+    if not sys.platform.startswith("win"):
+        return bool(read_json(SETTINGS_FILE, {}).get("autostart"))
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            winreg.QueryValueEx(k, "ImageStudio")
+            return True
+    except OSError:
+        return False
+
+
+def autostart_set(on: bool) -> None:
+    if not sys.platform.startswith("win"):
+        s = read_json(SETTINGS_FILE, {})
+        s["autostart"] = on
+        write_json(SETTINGS_FILE, s)
+        return
+    import winreg
+    pyw = Path(sys.executable).with_name("pythonw.exe")
+    cmd = f'"{pyw}" "{APP_DIR / "server.py"}" --tray --no-browser'
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+        if on:
+            winreg.SetValueEx(k, "ImageStudio", 0, winreg.REG_SZ, cmd)
+        else:
+            try:
+                winreg.DeleteValue(k, "ImageStudio")
+            except OSError:
+                pass
+
+
+class SettingsReq(BaseModel):
+    autostart: bool
+
+
+@app.get("/api/settings")
+def settings_get():
+    return {"autostart": autostart_get()}
+
+
+@app.post("/api/settings")
+def settings_set(req: SettingsReq):
+    try:
+        autostart_set(req.autostart)
+    except Exception:
+        log("Autostart setting failed:\n" + traceback.format_exc())
+        raise HTTPException(500, "Couldn't change that setting. Send studio_log.txt to Claude.")
+    log(f"Start with Windows: {'on' if req.autostart else 'off'}")
+    return settings_get()
+
+
+def scheduler_loop():
+    while True:
+        time.sleep(float(os.environ.get("IMAGE_STUDIO_TICK", "30")))
+        try:
+            queue_tick()
+        except Exception:
+            log("Queue check failed:\n" + traceback.format_exc())
+
+
 # ================================================================ launch
 def mark_interrupted_runs():
     for p in TRAIN_DIR.iterdir():
@@ -1219,7 +1627,8 @@ def main():
     log(f"Image Studio v{VERSION} starting at {url}" + (" (practice mode)" if FAKE else "") + (" in the tray" if tray else ""))
     mark_interrupted_runs()
     threading.Thread(target=load_engine, daemon=True).start()
-    if os.environ.get("IMAGE_STUDIO_NO_BROWSER") != "1":
+    threading.Thread(target=scheduler_loop, daemon=True).start()
+    if os.environ.get("IMAGE_STUDIO_NO_BROWSER") != "1" and "--no-browser" not in sys.argv:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     import uvicorn
     if tray:

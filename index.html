@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Image Studio v2.3</title>
+<title>Image Studio v2.4</title>
 <style>
   :root{
     --bg:#121016; --panel:#1b1821; --panel-2:#24202c; --line:#34303d;
@@ -74,6 +74,27 @@
   .chip[aria-pressed="true"]{border-color:var(--gold);color:var(--ink);background:#f2b84b1a}
   .chipgroup{font-size:13px;color:var(--ink-3);width:100%;margin:6px 0 -2px;text-transform:uppercase;letter-spacing:.06em}
   .chipgroup:first-child{margin-top:0}
+  .star{position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:9px;border:0;background:#000a;color:#fff;font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center}
+  .star[aria-pressed="true"]{color:var(--gold)}
+  .card .pic{position:relative}
+  .gear{border:1px solid var(--line);background:var(--panel);border-radius:10px;width:38px;height:38px;font-size:18px}
+  .away{border:1px solid var(--violet);background:#9b7bff14;border-radius:var(--r);padding:16px 18px;margin-bottom:18px}
+  .away h3{margin:0 0 10px}
+  .away .rows{display:flex;flex-direction:column;gap:10px}
+  .away .row2{display:flex;gap:12px;align-items:center}
+  .away .row2 img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#0c0a0f}
+  .away .bad{color:var(--bad)}
+  .qitem{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:8px 10px}
+  .qitem .t{flex:1;min-width:0}
+  .qitem small{color:var(--ink-3);display:block}
+  .qitem button{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:2px 8px}
+  .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:52vh;overflow:auto}
+  .wimg{position:relative;border:2px solid var(--line);border-radius:12px;overflow:hidden;padding:0;background:#0c0a0f;aspect-ratio:1;cursor:pointer}
+  .wimg img{width:100%;height:100%;object-fit:cover;display:block}
+  .wimg[aria-pressed="true"]{border-color:var(--gold)}
+  .wimg .tick{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:7px;background:#0008;border:2px solid #fff;display:grid;place-items:center;color:transparent;font-weight:700}
+  .wimg[aria-pressed="true"] .tick{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+  .wimg .lic{position:absolute;bottom:0;left:0;right:0;background:#000b;color:#ddd;font-size:11px;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .shape{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink-2)}
   .shape i{display:block;border:2px solid currentColor;border-radius:3px}
@@ -201,7 +222,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.3</small></div>
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.4</small></div>
   <nav role="tablist" aria-label="Screens">
     <button role="tab" id="tab-create" aria-selected="true" aria-controls="view-create">Create</button>
     <button role="tab" id="tab-characters" aria-selected="false" aria-controls="view-characters">Characters</button>
@@ -210,6 +231,7 @@
     <button role="tab" id="tab-train" aria-selected="false" aria-controls="view-train">Train</button>
   </nav>
   <div class="status" id="status" role="status" aria-live="polite"><span class="lamp"></span><span id="status-text">Starting…</span></div>
+  <button class="gear" id="gear" aria-label="Settings" title="Settings">⚙</button>
 </header>
 
 <main>
@@ -373,6 +395,7 @@
       <div class="topbar" id="gbar-normal">
         <h2>Gallery</h2><span class="n" id="gcount"></span>
         <span class="sp"></span>
+        <button class="btn" id="gfav" aria-pressed="false">⭐ Favorites only</button>
         <button class="btn" id="gselect">Select</button>
         <button class="btn" id="openFolder">Open My Images folder</button>
       </div>
@@ -398,11 +421,23 @@
         <button class="btn gold" id="pnew" style="margin-top:10px;width:100%">+ New project</button>
       </div>
       <div>
+        <label class="h">Overnight queue</label>
+        <div class="list" id="qlist"></div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center"><span style="font-size:15px">Start at</span><input type="time" id="qtime" value="01:00" style="flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px"></div>
+          <div style="display:flex;gap:8px"><button class="btn gold" id="qarm" style="flex:1">Schedule</button><button class="btn" id="qnow" style="flex:1">Start now</button></div>
+          <button class="btn" id="qoff" hidden>Cancel schedule</button>
+          <div class="note" id="qnote" style="margin:0"></div>
+        </div>
+      </div>
+      <div>
         <label class="h">My Models <span>(finished)</span></label>
         <div class="list" id="mlist"></div>
       </div>
     </div>
     <div class="pane" id="tpane">
+      <div class="away" id="away" hidden><h3>While you were away</h3><div class="rows" id="away-rows"></div>
+        <div class="actions" style="margin-top:12px"><button id="away-ok">Got it</button></div></div>
       <div class="empty" id="tempty"><div><b>Teach the app your own character</b>
         Start a new project, add 15–40 pictures of the same character<br>(or split a reference sheet), then press Train.</div></div>
       <div id="proj" hidden>
@@ -434,6 +469,7 @@
             Drag pictures here, or
             <button class="btn" id="padd">Add pictures</button>
             <button class="btn" id="psheet">Split a reference sheet</button>
+            <button class="btn" id="pweb">Find pictures online</button>
             <input type="file" id="pfile" accept="image/*" multiple hidden>
           </div>
           <div class="tgrid" id="tgrid"></div>
@@ -441,14 +477,16 @@
 
         <div class="sec" id="psec-train">
           <h3>2. Train</h3>
-          <p class="sub">Training uses the whole graphics card, so making pictures pauses until it's done. Keep the black Image Studio window open; closing the browser is fine. Times are rough guesses for your card.</p>
+          <p class="sub">Training uses the whole graphics card, so making pictures pauses until it's done. Keep Image Studio running (the purple tray icon); closing the browser is fine. Times are rough guesses for your card.</p>
           <div class="lengths" id="lengths">
             <button data-v="quick" aria-pressed="false"><b>Quick</b><small>600 steps · ~30–60 min · try it out</small></button>
             <button data-v="standard" aria-pressed="true"><b>Standard</b><small>1000 steps · ~1–1.5 hr · recommended</small></button>
             <button data-v="thorough" aria-pressed="false"><b>Thorough</b><small>1600 steps · ~1.5–2.5 hr · tricky characters</small></button>
           </div>
-          <button class="btn-main" id="ptrain" style="width:100%">Train</button>
+          <div style="display:flex;gap:10px"><button class="btn-main" id="ptrain" style="flex:2">Train now</button><button class="btn" id="pqueue" style="flex:1">Add to overnight queue</button></div>
           <div class="note" id="ptrain-note"></div>
+          <label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:15px"><input type="checkbox" id="pfavlearn" style="margin-top:4px">
+            <span><b>Learn from my favorites</b><br><span class="note" id="pfavnote" style="margin:0">When you've starred 20 new pictures made with this model, they're added here and it retrains overnight. The old version is kept as “(previous)”.</span></span></label>
         </div>
       </div>
     </div>
@@ -478,6 +516,29 @@
       <label class="h" style="margin-top:6px">Your outfit library</label>
       <div class="ogrid" id="mo-grid"></div>
     </div>
+  </div>
+</div>
+
+<!-- Find pictures online -->
+<div class="modal" id="m-web" hidden role="dialog" aria-modal="true" aria-labelledby="m-web-t">
+  <div class="dialog wide">
+    <h3 id="m-web-t">Find training pictures online</h3>
+    <p class="note" style="margin:0">Searches <b>Openverse</b>, a library of openly licensed pictures (Creative Commons and public domain). Each picture's license and credit is saved in the project. For things, places, creatures, and styles; not for real people.</p>
+    <div style="display:flex;gap:8px"><input type="text" id="w-q" placeholder="e.g. red panda, gothic cathedral interior, dragon skull" maxlength="120"><button class="btn gold" id="w-go">Search</button></div>
+    <div class="spinner" id="w-wait" hidden><i></i><span>Searching…</span></div>
+    <div class="msg bad" id="w-err" hidden></div>
+    <div class="wgrid" id="w-grid"></div>
+    <div class="row"><span class="note" id="w-count" style="margin-right:auto"></span><button class="btn" id="w-more" hidden>More results</button><button class="btn" data-close>Close</button><button class="btn gold" id="w-add" disabled>Add picked pictures</button></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal" id="m-settings" hidden role="dialog" aria-modal="true" aria-labelledby="m-settings-t">
+  <div class="dialog">
+    <h3 id="m-settings-t">Settings</h3>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:16px"><input type="checkbox" id="set-auto" style="margin-top:4px">
+      <span><b>Start Image Studio when Windows starts</b><br><span class="note" style="margin:0">Runs quietly in the tray (no browser pops up), so overnight training is ready to go. Your PC still has to be on and awake.</span></span></label>
+    <div class="row"><button class="btn" data-close>Close</button></div>
   </div>
 </div>
 
@@ -679,7 +740,8 @@ function fillCard(c, rec){
   c.className = "card"; c.dataset.file = rec.file;
   const pic = c.querySelector(".pic"); pic.innerHTML = "";
   const img = new Image(); img.src = imgURL(rec.file); img.alt = rec.prompt; pic.appendChild(img);
-  pic.onclick = () => openLB(rec);
+  pic.appendChild(starButton(rec.file));
+  pic.onclick = e => { if (!e.target.closest(".star")) openLB(rec); };
   const meta = c.querySelector(".meta");
   meta.innerHTML = `<div class="p"></div><div class="actions">
       <button data-a="more">More like this</button>
@@ -757,8 +819,11 @@ let gitems = [], selecting = false;
 const picked = new Set();
 async function loadGallery(){
   try { gitems = await getJSON("/api/gallery"); } catch { gitems = []; toast("Couldn't load the gallery.", true); }
+  await loadFavs();
+  if (favOnly) gitems = gitems.filter(r => favs[r.file]);
   const g = $("#ggrid"); g.innerHTML = "";
   $("#gempty").hidden = gitems.length > 0;
+  $("#gempty").querySelector("b").textContent = favOnly ? "No favorites yet" : "No pictures yet";
   $("#gcount").textContent = gitems.length ? `${gitems.length} picture${gitems.length === 1 ? "" : "s"}` : "";
   for (const rec of gitems){
     const b = document.createElement("button");
@@ -766,7 +831,8 @@ async function loadGallery(){
     b.setAttribute("aria-pressed", String(picked.has(rec.file)));
     b.innerHTML = `<span class="tick" aria-hidden="true">✓</span><img loading="lazy" alt="">` + (rec.model_name ? `<span class="tag">${esc(rec.model_name)}</span>` : "");
     b.querySelector("img").src = imgURL(rec.file); b.querySelector("img").alt = rec.prompt;
-    b.onclick = () => selecting ? togglePick(b) : openLB(rec);
+    if (!selecting) b.appendChild(starButton(rec.file));
+    b.onclick = e => { if (e.target.closest(".star")) return; selecting ? togglePick(b) : openLB(rec); };
     g.appendChild(b);
   }
 }
@@ -828,7 +894,7 @@ async function loadTrain(){
   await loadModels();
   if (curSlug && projects.some(p => p.slug === curSlug)) await openProject(curSlug);
   else { curSlug = ""; $("#proj").hidden = true; $("#tempty").hidden = false; }
-  checkTraining();
+  checkTraining(); loadQueue();
 }
 function renderProjectList(){
   const l = $("#plist");
@@ -888,6 +954,8 @@ async function openProject(slug){
   $("#pword").textContent = curProj.word;
   renderImages();
   renderProgress(curProj.progress, false);
+  $("#pfavlearn").checked = !!curProj.learn_from_favorites; $("#pfavlearn").disabled = !curProj.has_model && !curProj.learn_from_favorites;
+  showFavNote(curProj.pending_favorites);
 }
 function renderImages(){
   const imgs = curProj.images;
@@ -1330,8 +1398,155 @@ $("#sc-go").onclick = async () => {
   if (recs[0]) scFile = recs[0].scene.bg;
 };
 
+// ======================= FAVORITES =======================
+let favs = {}, favOnly = false;
+async function loadFavs(){ try { favs = await getJSON("/api/favorites"); } catch { favs = {}; } }
+function starButton(file){
+  const s = document.createElement("span");
+  s.className = "star"; s.setAttribute("role", "button"); s.tabIndex = 0; s.textContent = "★";
+  const paint = () => { s.setAttribute("aria-pressed", String(!!favs[file])); s.title = favs[file] ? "Remove from favorites" : "Add to favorites"; s.setAttribute("aria-label", s.title); };
+  paint();
+  const toggle = async e => {
+    e.stopPropagation(); e.preventDefault();
+    const on = !favs[file];
+    try { await api("/api/favorites", {file, on}); if (on) favs[file] = {starred: Date.now()}; else delete favs[file];
+      document.querySelectorAll(".star").forEach(x => x.dispatchEvent(new Event("repaint"))); }
+    catch (err){ toast(err.message, true); }
+  };
+  s.addEventListener("click", toggle);
+  s.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") toggle(e); });
+  s.addEventListener("repaint", paint);
+  s.dataset.file = file;
+  return s;
+}
+$("#gfav").onclick = () => { favOnly = !favOnly; $("#gfav").setAttribute("aria-pressed", String(favOnly)); $("#gfav").classList.toggle("gold", favOnly); loadGallery(); };
+loadFavs().then(() => document.querySelectorAll(".star").forEach(x => x.dispatchEvent(new Event("repaint"))));
+
+// ======================= QUEUE =======================
+let queue = null;
+const fmtWhen = iso => { const d = new Date(iso); const today = new Date().toDateString() === d.toDateString();
+  return (today ? "today " : d.toLocaleDateString(undefined, {weekday: "short"}) + " ") + d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}); };
+async function loadQueue(){
+  try { queue = await getJSON("/api/queue"); } catch { return; }
+  const l = $("#qlist"); l.innerHTML = queue.items.length ? "" : '<div class="note" style="margin:0">Nothing queued. Use “Add to overnight queue” on a project.</div>';
+  queue.items.forEach((it, i) => {
+    const d = document.createElement("div"); d.className = "qitem";
+    d.innerHTML = `<span class="t"><b></b><small></small></span><button data-a="up" aria-label="Move up">↑</button><button data-a="rm" aria-label="Remove">✕</button>`;
+    d.querySelector("b").textContent = `${i + 1}. ${it.name}`;
+    d.querySelector("small").textContent = `${it.length} · ${it.reason}`;
+    d.querySelector('[data-a="up"]').disabled = i === 0;
+    d.querySelector('[data-a="up"]').onclick = () => reorder(i, i - 1);
+    d.querySelector('[data-a="rm"]').onclick = () => reorder(i, -1);
+    l.appendChild(d);
+  });
+  const armed = !!queue.start_at;
+  $("#qoff").hidden = !armed && !queue.running;
+  $("#qnote").textContent = queue.running ? "Running now. One project at a time."
+    : armed ? (queue.now ? "Starting as soon as the engine is free." : `Starts ${fmtWhen(queue.start_at)} if you've been away from the app for 10 minutes. Keep the PC on and awake.`)
+    : queue.items.length ? "Not scheduled yet. Pick a time and press Schedule." : "";
+  renderAway();
+}
+async function reorder(from, to){
+  const slugs = queue.items.map(i => i.slug);
+  const [x] = slugs.splice(from, 1); if (to >= 0) slugs.splice(to, 0, x);
+  try { await api("/api/queue/order", {slugs}); loadQueue(); } catch (e){ toast(e.message, true); }
+}
+$("#qarm").onclick = async () => { try { await api("/api/queue/schedule", {mode: "time", time: $("#qtime").value}); store.set("qtime", $("#qtime").value); loadQueue(); toast("Queue scheduled."); } catch (e){ toast(e.message, true); } };
+$("#qnow").onclick = async () => {
+  if (!queue || !queue.items.length) return toast("Add a project to the queue first.", true);
+  if (!confirm("Start the queue now? Making pictures pauses while it trains.")) return;
+  try { await api("/api/queue/schedule", {mode: "now"}); loadQueue(); toast("The queue will start within a minute."); } catch (e){ toast(e.message, true); }
+};
+$("#qoff").onclick = async () => { try { await api("/api/queue/schedule", {mode: "off"}); loadQueue(); } catch (e){ toast(e.message, true); } };
+$("#qtime").value = store.get("qtime", "01:00");
+$("#pqueue").onclick = async () => {
+  try { await api("/api/queue/add", {slug: curSlug, length: length.get()}); await loadQueue();
+    toast(queue.start_at ? "Added to the queue." : "Added. Now pick a start time under Overnight queue and press Schedule."); }
+  catch (e){ toast(e.message, true); }
+};
+function renderAway(){
+  const unseen = (queue?.results || []).filter(r => !r.seen);
+  $("#away").hidden = !unseen.length;
+  const rows = $("#away-rows"); rows.innerHTML = "";
+  unseen.forEach(r => {
+    const d = document.createElement("div"); d.className = "row2";
+    const ok = r.status === "done";
+    d.innerHTML = (ok && r.sample ? `<img alt="">` : "") + `<div><b class="nm"></b><div class="st ${ok ? "" : "bad"}"></div><small class="wh" style="color:var(--ink-3)"></small></div>`;
+    if (ok && r.sample) d.querySelector("img").src = `/train-files/${encodeURIComponent(r.slug)}/samples/${encodeURIComponent(r.sample)}`;
+    d.querySelector(".nm").textContent = r.name;
+    d.querySelector(".st").textContent = ok ? `Finished (${r.step} steps). It's ready in the Model menu.` : (r.message || "Didn't finish.");
+    d.querySelector(".wh").textContent = r.finished ? fmtWhen(r.finished) : "";
+    rows.appendChild(d);
+  });
+}
+$("#away-ok").onclick = async () => { try { await api("/api/queue/seen"); queue.results.forEach(r => r.seen = true); renderAway(); } catch {} };
+async function checkAwayOnStart(){
+  await loadQueue();
+  const n = (queue?.results || []).filter(r => !r.seen).length;
+  if (n) toast(`${n} overnight training run${n === 1 ? "" : "s"} finished. See the Train tab.`);
+}
+
+// favorites learning checkbox
+$("#pfavlearn").onchange = async () => {
+  try { const r = await api(`/api/train/projects/${curSlug}/learn-favorites`, {on: $("#pfavlearn").checked}); showFavNote(r.pending); loadQueue(); }
+  catch (e){ toast(e.message, true); $("#pfavlearn").checked = !$("#pfavlearn").checked; }
+};
+function showFavNote(pending){
+  const base = "When you've starred 20 new pictures made with this model, they're added here and it retrains overnight. The old version is kept as “(previous)”.";
+  $("#pfavnote").textContent = curProj && curProj.has_model ? base + (pending != null ? ` Starred so far: ${pending} of 20.` : "") : "Train this project once first; then pictures you star that were made with its model count toward a retrain.";
+}
+
+// ======================= FIND PICTURES ONLINE =======================
+let wPicked = new Map(), wPage = 1, wQuery = "";
+$("#pweb").onclick = () => { wPicked.clear(); $("#w-grid").innerHTML = ""; $("#w-q").value = ""; $("#w-err").hidden = true; $("#w-more").hidden = true; updateWeb(); openModal("#m-web"); };
+function updateWeb(){ $("#w-count").textContent = wPicked.size ? `${wPicked.size} picked` : "Click pictures to pick them."; $("#w-add").disabled = !wPicked.size; }
+async function webSearch(more){
+  const q = $("#w-q").value.trim(); if (!q) return;
+  if (!more) { wPage = 1; wQuery = q; $("#w-grid").innerHTML = ""; } else wPage++;
+  $("#w-wait").hidden = false; $("#w-err").hidden = true;
+  try {
+    const r = await getJSON2(`/api/openverse/search?q=${encodeURIComponent(wQuery)}&page=${wPage}`);
+    if (!r.results.length && !more) { $("#w-err").textContent = "No pictures found. Try different words."; $("#w-err").hidden = false; }
+    r.results.forEach(it => {
+      const b = document.createElement("button"); b.className = "wimg"; b.setAttribute("aria-pressed", String(wPicked.has(it.id)));
+      b.innerHTML = `<img alt="" loading="lazy" referrerpolicy="no-referrer"><span class="tick">✓</span><span class="lic"></span>`;
+      b.querySelector("img").src = it.thumb; b.querySelector("img").alt = it.title || wQuery;
+      b.querySelector(".lic").textContent = `${(it.license || "").toUpperCase()} ${it.license_version || ""}${it.creator ? " · " + it.creator : ""}`;
+      b.title = it.title || "";
+      b.onclick = () => { wPicked.has(it.id) ? wPicked.delete(it.id) : wPicked.set(it.id, it); b.setAttribute("aria-pressed", String(wPicked.has(it.id))); updateWeb(); };
+      $("#w-grid").appendChild(b);
+    });
+    $("#w-more").hidden = wPage >= (r.pages || 1);
+  } catch (e){ $("#w-err").textContent = e.message; $("#w-err").hidden = false; }
+  $("#w-wait").hidden = true;
+}
+async function getJSON2(path){ const r = await fetch(path); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || "Couldn't load that."); return d; }
+$("#w-go").onclick = () => webSearch(false);
+$("#w-q").addEventListener("keydown", e => { if (e.key === "Enter") webSearch(false); });
+$("#w-more").onclick = () => webSearch(true);
+$("#w-add").onclick = async () => {
+  $("#w-add").disabled = true; toast(`Downloading ${wPicked.size} picture${wPicked.size === 1 ? "" : "s"}…`);
+  try {
+    const r = await api(`/api/train/projects/${curSlug}/from-web`, {items: [...wPicked.values()]});
+    closeModal("#m-web"); await openProject(curSlug); refreshProjectCounts();
+    toast(`Added ${r.added} picture${r.added === 1 ? "" : "s"}` + (r.failed ? ` (${r.failed} couldn't be downloaded or were too small)` : "") + ".");
+  } catch (e){ toast(e.message, true); }
+  updateWeb();
+};
+
+// ======================= SETTINGS =======================
+$("#gear").onclick = async () => {
+  try { const s = await getJSON("/api/settings"); $("#set-auto").checked = !!s.autostart; } catch {}
+  openModal("#m-settings");
+};
+$("#set-auto").onchange = async () => {
+  try { const s = await api("/api/settings", {autostart: $("#set-auto").checked}); $("#set-auto").checked = !!s.autostart; toast(s.autostart ? "Image Studio will start with Windows." : "Image Studio won't start with Windows."); }
+  catch (e){ toast(e.message, true); }
+};
+
 loadModels();
 loadOutfits();
+checkAwayOnStart();
 pollStatus();
 </script>
 </body>

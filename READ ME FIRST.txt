@@ -1,4 +1,4 @@
-IMAGE STUDIO v2.1
+IMAGE STUDIO v2.4
 =================
 
 FIRST TIME ONLY
@@ -21,9 +21,13 @@ SCREENS
   Outfits  On Create or Scene, "Copy an outfit" reads the clothes in a picture
            you upload and adds them to your prompt (one-time ~17 GB download).
   Gallery  Everything you've made. Click a picture for details. "Select" lets
-           you delete several at once or add them to a training project. Deleted pictures go to the Recycle Bin.
+           you delete several at once or add them to a training project. The star marks favorites. Deleted pictures go to the Recycle Bin.
   Train    Teach the app your own character: new project > add 15-40 pictures
-           (or split a reference sheet) > Train. Takes about 1-3 hours.
+           (upload, split a reference sheet, or "Find pictures online") >
+           Train now, or "Add to overnight queue" and Schedule a start time.
+           "Learn from my favorites": star 20 pictures made with a model and it
+           retrains overnight (the old version is kept as "(previous)").
+  Settings (gear, top right) "Start Image Studio when Windows starts".
 
 FOLDERS
   My Images   your pictures (each stores the prompt that made it)
@@ -32,10 +36,12 @@ FOLDERS
   Outfits     your saved outfits
   Characters  your saved character cards
   Scenes      backgrounds you've uploaded
+  queue.json / favorites.json   overnight queue and your stars
 
 PRIVATE
   Runs only on this PC. Making pictures never uses the internet.
-  (Training downloads a small add-on once, the first time you train.)
+  (Training downloads a small add-on once. "Find pictures online" uses the
+  internet to search Openverse; licenses are saved in each project's credits.json.)
 
 IF SOMETHING GOES WRONG
   Send Claude a screenshot of the black window, or studio_log.txt

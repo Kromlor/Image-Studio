@@ -22,3 +22,6 @@ Characters/
 Scenes/
 console_log.txt
 reader_log.txt
+queue.json
+favorites.json
+settings.json
