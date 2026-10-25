@@ -12,6 +12,7 @@ studio_log.txt
 train_log.txt
 *.safetensors
 *.png
+!image-studio.ico
 *.jpg
 *.jpeg
 *.webp
