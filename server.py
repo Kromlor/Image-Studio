@@ -1,5 +1,5 @@
 """
-Riley's Image Studio v2.1
+Riley's Image Studio v2.2
 A private image generator that runs only on this PC (address 127.0.0.1 = this computer only).
 Engine: FLUX.1 Schnell (open weights, Apache-2.0). Trains your own character models (LoRA).
 """
@@ -22,7 +22,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "2.1"
+VERSION = "2.2"
 APP_DIR = Path(__file__).resolve().parent
 MODELS_DIR = APP_DIR / "models"
 IMAGES_DIR = APP_DIR / "My Images"
@@ -84,6 +84,41 @@ STYLES = {
     "fantasy": ", epic fantasy art, dramatic lighting, painterly, highly detailed",
     "pixel": ", pixel art, 16-bit video game style, crisp pixels, limited palette",
     "comic": ", bold comic book art, ink outlines, flat vivid colors",
+    # animation & games
+    "anim3d": ", high-definition 3D animated movie still, expressive stylized characters, soft global illumination, detailed textures, vibrant color",
+    "anime": ", anime style, clean cel shading, crisp line art, vibrant colors, detailed expressive eyes",
+    "anime90s": ", 1990s retro anime style, hand-painted cel animation, soft film grain, muted pastel palette",
+    "chibi": ", chibi style, cute oversized head and small body, kawaii, soft pastel colors",
+    "cartoon": ", 2D cartoon style, bold clean outlines, flat bright colors, playful",
+    "claymation": ", stop-motion claymation style, handmade clay figures, fingerprint textures, miniature set",
+    "lowpoly": ", low-poly 3D art, faceted geometric shapes, flat shading, clean pastel colors",
+    "voxel": ", voxel art, blocky 3D cubes, isometric view, bright colors",
+    "concept": ", video game concept art, detailed character design, painterly, professional",
+    "tradingcard": ", fantasy trading card illustration, dynamic heroic pose, dramatic lighting, rich detail",
+    # fantasy & mood
+    "darkfantasy": ", dark fantasy art, gothic atmosphere, moody dramatic lighting, muted desaturated palette, ominous, highly detailed",
+    "highfantasy": ", high fantasy art, luminous magical light, lush vivid colors, epic and whimsical",
+    "horror": ", eerie horror style, unsettling shadows, fog, cold desaturated colors",
+    "cyberpunk": ", cyberpunk style, neon lights, rain-slicked streets, futuristic city, high contrast",
+    "steampunk": ", steampunk style, brass gears and copper pipes, Victorian era, warm sepia tones",
+    "scifi": ", sleek science fiction art, futuristic technology, clean metallic surfaces, cinematic",
+    "synthwave": ", synthwave retro 1980s style, neon pink and purple, glowing sunset grid",
+    "noir": ", film noir, black and white, dramatic high-contrast shadows, 1940s mood",
+    # photo & film
+    "cinematic": ", cinematic film still, anamorphic lens, shallow depth of field, dramatic color grading",
+    "vintage": ", vintage 1970s photograph, film grain, faded warm colors",
+    "polaroid": ", instant film photo, soft flash, slightly washed-out colors, white border",
+    "studio": ", professional studio portrait photography, softbox lighting, clean backdrop, sharp detail",
+    # painting & drawing
+    "oil": ", classical oil painting, visible brushstrokes, rich canvas texture, old masters lighting",
+    "impressionist": ", impressionist painting, loose dappled brushstrokes, soft light and color",
+    "inkwash": ", East Asian ink wash painting, flowing brush strokes, minimal color, rice paper texture",
+    "sketch": ", pencil sketch, graphite shading, hand-drawn lines on paper",
+    "charcoal": ", charcoal drawing, smudged dramatic shading, textured paper",
+    "popart": ", pop art style, bold primary colors, halftone dots, thick outlines",
+    "stainedglass": ", stained glass art, bold black leading, glowing jewel-tone colors",
+    "papercraft": ", layered paper craft art, cut paper shapes, soft shadows, handmade",
+    "vector": ", flat vector illustration, clean geometric shapes, limited color palette",
 }
 LENGTHS = {"quick": 600, "standard": 1000, "thorough": 1600}
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Image Studio v2.1</title>
+<title>Image Studio v2.2</title>
 <style>
   :root{
     --bg:#121016; --panel:#1b1821; --panel-2:#24202c; --line:#34303d;
@@ -72,6 +72,8 @@
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{border:1px solid var(--line);background:var(--bg);padding:8px 14px;border-radius:999px;color:var(--ink-2)}
   .chip[aria-pressed="true"]{border-color:var(--gold);color:var(--ink);background:#f2b84b1a}
+  .chipgroup{font-size:13px;color:var(--ink-3);width:100%;margin:6px 0 -2px;text-transform:uppercase;letter-spacing:.06em}
+  .chipgroup:first-child{margin-top:0}
   .shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .shape{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink-2)}
   .shape i{display:block;border:2px solid currentColor;border-radius:3px}
@@ -199,7 +201,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.1</small></div>
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.2</small></div>
   <nav role="tablist" aria-label="Screens">
     <button role="tab" id="tab-create" aria-selected="true" aria-controls="view-create">Create</button>
     <button role="tab" id="tab-characters" aria-selected="false" aria-controls="view-characters">Characters</button>
@@ -233,15 +235,7 @@
       </div>
       <div>
         <label class="h">Style <span>(optional)</span></label>
-        <div class="chips" id="styles">
-          <button class="chip" data-v="none" aria-pressed="true">None</button>
-          <button class="chip" data-v="illustration" aria-pressed="false">Illustration</button>
-          <button class="chip" data-v="watercolor" aria-pressed="false">Watercolor</button>
-          <button class="chip" data-v="photo" aria-pressed="false">Photo</button>
-          <button class="chip" data-v="fantasy" aria-pressed="false">Fantasy art</button>
-          <button class="chip" data-v="pixel" aria-pressed="false">Pixel art</button>
-          <button class="chip" data-v="comic" aria-pressed="false">Comic</button>
-        </div>
+        <div class="chips" id="styles"></div>
       </div>
       <div>
         <label class="h">Shape</label>
@@ -315,7 +309,7 @@
           <label>Lighting <select data-f="lighting"><option selected>soft natural light</option><option>golden hour sunlight</option><option>studio lighting</option><option>moody evening light</option><option>neon city lights</option><option>candlelight</option></select></label>
           <label class="full">Setting <input type="text" data-f="setting" placeholder="e.g. a cozy coffee shop" maxlength="120"></label>
           <label class="full">Extra details <span style="font-size:12px;color:var(--ink-3)">(optional)</span><input type="text" data-f="extra" placeholder="e.g. holding a sketchbook, smiling" maxlength="200"></label>
-          <label>Art style <select data-f="style"><option value="none">None</option><option value="illustration">Illustration</option><option value="watercolor">Watercolor</option><option value="photo" selected>Photo</option><option value="fantasy">Fantasy art</option><option value="pixel">Pixel art</option><option value="comic">Comic</option></select></label>
+          <label>Art style <select data-f="style" class="style-select" data-default="photo"></select></label>
           <label>Shape <select data-f="shape"><option value="tall" selected>Tall</option><option value="square">Square</option><option value="wide">Wide</option></select></label>
         </div>
       </div>
@@ -353,7 +347,7 @@
       </div>
       <div>
         <label class="h" for="sc-style">Style</label>
-        <select id="sc-style"><option value="none">Match the background</option><option value="photo">Photo</option><option value="illustration">Illustration</option><option value="watercolor">Watercolor</option><option value="fantasy">Fantasy art</option><option value="comic">Comic</option><option value="pixel">Pixel art</option></select>
+        <select id="sc-style" class="style-select" data-none="Match the background"></select>
       </div>
       <div class="go">
         <button class="btn-main" id="sc-go" disabled>Place in scene</button>
@@ -549,7 +543,25 @@
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const STYLE_NAMES = {none:"", illustration:"Illustration", watercolor:"Watercolor", photo:"Photo", fantasy:"Fantasy art", pixel:"Pixel art", comic:"Comic"};
+const STYLE_GROUPS = [
+  ["Basics", [["none","None"],["photo","Photo"],["illustration","Illustration"],["watercolor","Watercolor"],["fantasy","Fantasy art"],["pixel","Pixel art"],["comic","Comic"]]],
+  ["Animation & games", [["anim3d","HD 3D animation"],["anime","Anime"],["anime90s","Retro anime"],["chibi","Chibi"],["cartoon","Cartoon"],["claymation","Claymation"],["lowpoly","Low-poly"],["voxel","Voxel"],["concept","Game concept art"],["tradingcard","Trading card"]]],
+  ["Fantasy & mood", [["darkfantasy","Dark fantasy"],["highfantasy","High fantasy"],["horror","Horror"],["cyberpunk","Cyberpunk"],["steampunk","Steampunk"],["scifi","Sci-fi"],["synthwave","Synthwave"],["noir","Film noir"]]],
+  ["Photo & film", [["cinematic","Cinematic"],["vintage","Vintage photo"],["polaroid","Instant photo"],["studio","Studio portrait"]]],
+  ["Painting & drawing", [["oil","Oil painting"],["impressionist","Impressionist"],["inkwash","Ink wash"],["sketch","Pencil sketch"],["charcoal","Charcoal"],["popart","Pop art"],["stainedglass","Stained glass"],["papercraft","Paper craft"],["vector","Flat vector"]]],
+];
+const STYLE_NAMES = Object.fromEntries(STYLE_GROUPS.flatMap(g => g[1]));
+STYLE_NAMES.none = "";
+(function buildStyles(){
+  const box = document.getElementById("styles");
+  box.innerHTML = STYLE_GROUPS.map(([g, items]) => `<div class="chipgroup">${g}</div>` +
+    items.map(([v, n]) => `<button class="chip" data-v="${v}" aria-pressed="false">${n}</button>`).join("")).join("");
+  document.querySelectorAll(".style-select").forEach(sel => {
+    sel.innerHTML = STYLE_GROUPS.map(([g, items]) => `<optgroup label="${g}">` +
+      items.map(([v, n]) => `<option value="${v}">${v === "none" && sel.dataset.none ? sel.dataset.none : n}</option>`).join("") + "</optgroup>").join("");
+    if (sel.dataset.default) { sel.value = sel.dataset.default; [...sel.options].find(o => o.value === sel.dataset.default).defaultSelected = true; }
+  });
+})();
 const SHAPE_RATIO = {square:"1 / 1", tall:"896 / 1152", wide:"1152 / 896"};
 let ready = false, busy = false, stopAsked = false, lbItem = null, models = [];
 
