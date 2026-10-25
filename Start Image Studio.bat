@@ -21,6 +21,7 @@ if errorlevel 1 goto :updatefail
 copy /y requirements.txt "venv\installed-requirements.txt" >nul
 
 :start
+"venv\Scripts\python.exe" ensure_parts.py
 rem ---- runs hidden, with a small icon by the clock (right-click it to quit) ----
 "venv\Scripts\python.exe" -c "import pystray" >nul 2>&1
 if errorlevel 1 goto :window
