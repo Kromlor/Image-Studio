@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Studio v2.0</title>
+<style>
+  :root{
+    --bg:#121016; --panel:#1b1821; --panel-2:#24202c; --line:#34303d;
+    --ink:#f3efe7; --ink-2:#b9b2c4; --ink-3:#857e91;
+    --gold:#f2b84b; --gold-ink:#1d1406; --violet:#9b7bff; --bad:#ff7a6b; --good:#6fd39a;
+    --r:14px;
+    --font:"Atkinson Hyperlegible","Lexend","Segoe UI",system-ui,sans-serif;
+  }
+  [hidden]{display:none!important}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 var(--font);display:flex;flex-direction:column}
+  button,textarea,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .btn{border:1px solid var(--line);background:var(--panel-2);padding:8px 14px;border-radius:10px}
+  .btn:hover{border-color:var(--ink-3)}
+  .btn.gold{background:var(--gold);color:var(--gold-ink);border-color:var(--gold);font-weight:700}
+  .btn.bad{color:var(--bad)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 12px;width:100%}
+
+  header{display:flex;align-items:center;gap:20px;padding:10px 22px;border-bottom:1px solid var(--line);background:#16131b;flex:none}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px}
+  .brand .dot{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 200deg,var(--gold),var(--violet),#4fc3d9,var(--gold))}
+  .brand small{font-weight:400;color:var(--ink-3);font-size:14px}
+  nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+  nav button{background:none;border:0;padding:7px 18px;border-radius:9px;color:var(--ink-2);font-weight:700}
+  nav button[aria-selected="true"]{background:var(--panel-2);color:var(--ink)}
+  .status{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--ink-2);max-width:48%;text-align:right}
+  .status .lamp{flex:none;width:11px;height:11px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px #f2b84b33}
+  .status.ready .lamp{background:var(--good);box-shadow:0 0 0 3px #6fd39a33}
+  .status.error .lamp{background:var(--bad);box-shadow:0 0 0 3px #ff7a6b33}
+  .status.training .lamp{background:var(--violet);box-shadow:0 0 0 3px #9b7bff33}
+
+  main{flex:1;min-height:0;display:flex}
+  .view{flex:1;min-height:0;display:flex}
+  .side{width:400px;flex:none;border-right:1px solid var(--line);padding:22px;overflow:auto;display:flex;flex-direction:column;gap:20px;background:var(--panel)}
+  label.h{display:block;font-weight:700;margin-bottom:8px}
+  label.h span{font-weight:400;color:var(--ink-3);font-size:14px}
+  textarea{width:100%;min-height:140px;resize:vertical;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px;line-height:1.5}
+  textarea::placeholder{color:var(--ink-3)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--bg);padding:8px 14px;border-radius:999px;color:var(--ink-2)}
+  .chip[aria-pressed="true"]{border-color:var(--gold);color:var(--ink);background:#f2b84b1a}
+  .shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .shape{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink-2)}
+  .shape i{display:block;border:2px solid currentColor;border-radius:3px}
+  .shape[aria-pressed="true"]{border-color:var(--gold);color:var(--ink);background:#f2b84b1a}
+  .count{display:flex;gap:8px}
+  .count button{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 0;font-weight:700;color:var(--ink-2)}
+  .count button[aria-pressed="true"]{border-color:var(--gold);color:var(--ink);background:#f2b84b1a}
+  .strength{display:flex;align-items:center;gap:12px;margin-top:10px}
+  .strength input{flex:1;accent-color:var(--gold)}
+  .note{color:var(--ink-3);font-size:14px;margin-top:6px}
+  .go{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+  .btn-main{border:0;background:var(--gold);color:var(--gold-ink);font-weight:700;font-size:19px;padding:16px;border-radius:var(--r)}
+  .btn-main:disabled{opacity:.45;cursor:not-allowed}
+  .btn-stop{border:1px solid var(--line);background:none;border-radius:var(--r);padding:10px;color:var(--ink-2)}
+  .hint{color:var(--ink-3);font-size:14px;text-align:center}
+
+  .pane{flex:1;overflow:auto;padding:22px}
+  .empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--ink-3);padding:30px}
+  .empty b{display:block;color:var(--ink-2);font-size:22px;margin-bottom:6px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+  .card .pic{background:#0c0a0f;aspect-ratio:1;display:grid;place-items:center;cursor:zoom-in}
+  .card .pic img{width:100%;height:100%;object-fit:contain;display:block}
+  .card.busy .pic{cursor:default;background:linear-gradient(110deg,#1a1720 30%,#2a2533 50%,#1a1720 70%);background-size:300% 100%;animation:shimmer 1.6s linear infinite;color:var(--ink-2)}
+  .card.failed .pic{cursor:default;color:var(--bad);padding:20px;text-align:center}
+  @keyframes shimmer{to{background-position:-150% 0}}
+  .card .meta{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+  .card .p{color:var(--ink-2);font-size:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .actions{display:flex;flex-wrap:wrap;gap:8px}
+  .actions button,.actions a{border:1px solid var(--line);background:var(--panel-2);padding:7px 12px;border-radius:10px;font-size:15px;text-decoration:none;color:var(--ink)}
+  .actions button:hover,.actions a:hover{border-color:var(--ink-3)}
+  .actions .del{color:var(--bad)}
+  .secs{color:var(--ink-3);font-size:13px;margin-left:auto;align-self:center}
+
+  /* Gallery */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .topbar h2{margin:0;font-size:22px}
+  .topbar .n{color:var(--ink-3)}
+  .topbar .sp{margin-left:auto}
+  .ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .thumb{position:relative;border:1px solid var(--line);background:#0c0a0f;border-radius:12px;overflow:hidden;aspect-ratio:1;padding:0;cursor:zoom-in}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .selecting .thumb{cursor:pointer}
+  .thumb .tick{position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:8px;border:2px solid #fff;background:#0008;display:none;place-items:center;font-weight:700}
+  .selecting .thumb .tick{display:grid}
+  .thumb[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold) inset}
+  .thumb[aria-pressed="true"] .tick{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+  .thumb .tag{position:absolute;bottom:6px;right:6px;background:#000a;color:#fff;font-size:12px;padding:2px 8px;border-radius:999px}
+
+  /* Train */
+  .list{display:flex;flex-direction:column;gap:6px}
+  .item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;text-align:left;width:100%}
+  .item[aria-current="true"]{border-color:var(--gold);background:#f2b84b14}
+  .item .t{flex:1;min-width:0}
+  .item .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .t small{color:var(--ink-3)}
+  .model{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px}
+  .model b{display:block}
+  .model small{color:var(--ink-3)}
+  .model .actions{margin-top:8px}
+  .model .actions button{font-size:14px;padding:5px 10px}
+  .sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:18px}
+  .sec h3{margin:0 0 6px;font-size:19px}
+  .sec .sub{color:var(--ink-3);font-size:15px;margin:0 0 14px}
+  .word{display:inline-block;background:#9b7bff26;border:1px solid #9b7bff66;color:#d8ccff;padding:2px 10px;border-radius:999px;font-weight:700;font-size:15px}
+  .drop{border:2px dashed var(--line);border-radius:var(--r);padding:16px;text-align:center;color:var(--ink-3);margin-bottom:14px}
+  .drop.over{border-color:var(--gold);color:var(--ink)}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+  .timg{background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .timg .ph{position:relative;aspect-ratio:1;background:#0c0a0f}
+  .timg .ph{overflow:hidden;min-height:0}
+  .timg .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+  .timg .x{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:8px;border:0;background:#000b;color:#fff;font-size:16px}
+  .timg .warn{position:absolute;bottom:6px;left:6px;background:#ff7a6bdd;color:#1a0b08;font-size:12px;padding:2px 8px;border-radius:999px;font-weight:700}
+  .timg input{border:0;border-top:1px solid var(--line);border-radius:0;font-size:14px;padding:8px 10px;background:transparent}
+  .lengths{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .lengths button{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;text-align:left;color:var(--ink-2)}
+  .lengths button b{display:block;color:var(--ink)}
+  .lengths button small{font-size:13px}
+  .lengths button[aria-pressed="true"]{border-color:var(--gold);background:#f2b84b1a}
+  .bar{height:14px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--gold));width:0;transition:width .6s}
+  .pstats{display:flex;gap:18px;flex-wrap:wrap;color:var(--ink-2);margin:10px 0 14px;font-size:15px}
+  .pstats b{color:var(--ink)}
+  .samples{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+  .samples figure{margin:0}
+  .samples img{width:100%;border-radius:10px;display:block;cursor:zoom-in}
+  .samples figcaption{color:var(--ink-3);font-size:13px;text-align:center;margin-top:4px}
+  .msg{padding:10px 14px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);margin-bottom:12px}
+  .msg.bad{border-color:var(--bad)}
+  .msg.good{border-color:var(--good)}
+
+  /* Modals */
+  .modal{position:fixed;inset:0;background:#08060bdd;display:grid;place-items:center;z-index:15;padding:20px}
+  .dialog{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;width:min(520px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:14px}
+  .dialog.wide{width:min(1200px,100%)}
+  .dialog h3{margin:0}
+  .dialog .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .cropwrap{position:relative;align-self:center;max-width:100%;user-select:none;touch-action:none;cursor:crosshair;line-height:0}
+  .cropwrap img{max-width:100%;max-height:62vh;display:block}
+  .box{position:absolute;border:2px solid var(--gold);background:#f2b84b22}
+  .box span{position:absolute;top:-2px;left:-2px;background:var(--gold);color:var(--gold-ink);font:700 13px/1 var(--font);padding:4px 7px}
+
+  .lb{position:fixed;inset:0;background:#08060bee;display:flex;z-index:10}
+  .lb .stage{flex:1;display:grid;place-items:center;padding:24px;min-width:0}
+  .lb .stage img{max-width:100%;max-height:calc(100vh - 48px);border-radius:10px}
+  .lb aside{width:340px;flex:none;background:var(--panel);border-left:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+  .lb aside .p{white-space:pre-wrap}
+  .lb aside .small{color:var(--ink-3);font-size:14px}
+  .lb .close{align-self:flex-end}
+  .lb .actions{flex-direction:column}
+  .lb .actions button,.lb .actions a{text-align:center;padding:10px}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:12px 18px;border-radius:12px;z-index:30;max-width:90vw}
+  .toast.bad{border-color:var(--bad)}
+
+  @media (max-width:820px){
+    main .view{flex-direction:column}
+    .side{width:auto;border-right:0;border-bottom:1px solid var(--line)}
+    .lb{flex-direction:column}.lb aside{width:auto}
+    .lengths{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){.card.busy .pic{animation:none}.bar i{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.0</small></div>
+  <nav role="tablist" aria-label="Screens">
+    <button role="tab" id="tab-create" aria-selected="true" aria-controls="view-create">Create</button>
+    <button role="tab" id="tab-gallery" aria-selected="false" aria-controls="view-gallery">Gallery</button>
+    <button role="tab" id="tab-train" aria-selected="false" aria-controls="view-train">Train</button>
+  </nav>
+  <div class="status" id="status" role="status" aria-live="polite"><span class="lamp"></span><span id="status-text">Starting…</span></div>
+</header>
+
+<main>
+  <!-- ======================= CREATE ======================= -->
+  <section class="view" id="view-create" role="tabpanel" aria-labelledby="tab-create">
+    <div class="side">
+      <div>
+        <label class="h" for="model">Model</label>
+        <select id="model"><option value="">Standard</option></select>
+        <div id="model-extra" hidden>
+          <div class="strength"><label for="strength" style="font-size:15px">Strength</label><input type="range" id="strength" min="0.3" max="1.5" step="0.05" value="1"><b id="strength-v">1.00</b></div>
+          <div class="note" id="model-note"></div>
+        </div>
+      </div>
+      <div>
+        <label class="h" for="prompt">Your idea</label>
+        <textarea id="prompt" placeholder="A dragon made of autumn leaves curled around a lighthouse at sunset…"></textarea>
+      </div>
+      <div>
+        <label class="h">Style <span>(optional)</span></label>
+        <div class="chips" id="styles">
+          <button class="chip" data-v="none" aria-pressed="true">None</button>
+          <button class="chip" data-v="illustration" aria-pressed="false">Illustration</button>
+          <button class="chip" data-v="watercolor" aria-pressed="false">Watercolor</button>
+          <button class="chip" data-v="photo" aria-pressed="false">Photo</button>
+          <button class="chip" data-v="fantasy" aria-pressed="false">Fantasy art</button>
+          <button class="chip" data-v="pixel" aria-pressed="false">Pixel art</button>
+          <button class="chip" data-v="comic" aria-pressed="false">Comic</button>
+        </div>
+      </div>
+      <div>
+        <label class="h">Shape</label>
+        <div class="shapes" id="shapes">
+          <button class="shape" data-v="square" aria-pressed="true"><i style="width:26px;height:26px"></i>Square</button>
+          <button class="shape" data-v="tall" aria-pressed="false"><i style="width:21px;height:28px"></i>Tall</button>
+          <button class="shape" data-v="wide" aria-pressed="false"><i style="width:28px;height:21px"></i>Wide</button>
+        </div>
+      </div>
+      <div>
+        <label class="h">How many</label>
+        <div class="count" id="count">
+          <button data-v="1" aria-pressed="true">1</button>
+          <button data-v="2" aria-pressed="false">2</button>
+          <button data-v="3" aria-pressed="false">3</button>
+          <button data-v="4" aria-pressed="false">4</button>
+        </div>
+      </div>
+      <div class="go">
+        <button class="btn-main" id="go" disabled>Generate</button>
+        <button class="btn-stop" id="stop" hidden>Stop after this one</button>
+        <div class="hint">Ctrl + Enter also generates. Every picture saves automatically.</div>
+      </div>
+    </div>
+    <div class="pane" id="results">
+      <div class="empty" id="empty"><div><b>Your pictures will appear here</b>Type an idea on the left and press Generate.</div></div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
+
+  <!-- ======================= GALLERY ======================= -->
+  <section class="view" id="view-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
+    <div class="pane" id="gpane">
+      <div class="topbar" id="gbar-normal">
+        <h2>Gallery</h2><span class="n" id="gcount"></span>
+        <span class="sp"></span>
+        <button class="btn" id="gselect">Select</button>
+        <button class="btn" id="openFolder">Open My Images folder</button>
+      </div>
+      <div class="topbar" id="gbar-select" hidden>
+        <h2 id="gsel-count">0 selected</h2>
+        <span class="sp"></span>
+        <button class="btn" id="gsel-all">Select all</button>
+        <button class="btn bad" id="gsel-del" disabled>Delete</button>
+        <button class="btn" id="gsel-cancel">Done</button>
+      </div>
+      <div class="empty" id="gempty" hidden><div><b>No pictures yet</b>Everything you make shows up here.</div></div>
+      <div class="ggrid" id="ggrid"></div>
+    </div>
+  </section>
+
+  <!-- ======================= TRAIN ======================= -->
+  <section class="view" id="view-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+    <div class="side">
+      <div>
+        <label class="h">Training projects</label>
+        <div class="list" id="plist"></div>
+        <button class="btn gold" id="pnew" style="margin-top:10px;width:100%">+ New project</button>
+      </div>
+      <div>
+        <label class="h">My Models <span>(finished)</span></label>
+        <div class="list" id="mlist"></div>
+      </div>
+    </div>
+    <div class="pane" id="tpane">
+      <div class="empty" id="tempty"><div><b>Teach the app your own character</b>
+        Start a new project, add 15–40 pictures of the same character<br>(or split a reference sheet), then press Train.</div></div>
+      <div id="proj" hidden>
+        <div class="topbar">
+          <h2 id="pname"></h2><span class="word" id="pword"></span>
+          <span class="sp"></span>
+          <button class="btn bad" id="pdel">Delete project</button>
+        </div>
+
+        <div class="sec" id="psec-progress" hidden>
+          <h3 id="pg-title">Training</h3>
+          <div class="msg" id="pg-msg"></div>
+          <div class="bar"><i id="pg-bar"></i></div>
+          <div class="pstats"><span>Step <b id="pg-step">0</b> of <b id="pg-total">0</b></span><span>Time left <b id="pg-eta">—</b></span><span>Learning score <b id="pg-loss">—</b> <small style="color:var(--ink-3)">(lower is better; it bounces around)</small></span></div>
+          <div class="actions" id="pg-running-actions">
+            <button id="pg-keep">Stop now and keep what it learned</button>
+            <button id="pg-stop" class="del">Stop and throw it away</button>
+          </div>
+          <div class="actions" id="pg-done-actions" hidden>
+            <button id="pg-use" style="background:var(--gold);color:var(--gold-ink);border-color:var(--gold);font-weight:700">Use it in Create</button>
+          </div>
+          <div class="samples" id="pg-samples"></div>
+        </div>
+
+        <div class="sec">
+          <h3>1. Pictures <span id="pcount" style="color:var(--ink-3);font-weight:400;font-size:16px"></span></h3>
+          <p class="sub">Use 15–40 pictures of the <b>same</b> character in different poses, angles, and backgrounds. Captions are optional; describe the pose or setting (e.g. “back view”, “holding a staff”), not the character.</p>
+          <div class="drop" id="drop">
+            Drag pictures here, or
+            <button class="btn" id="padd">Add pictures</button>
+            <button class="btn" id="psheet">Split a reference sheet</button>
+            <input type="file" id="pfile" accept="image/*" multiple hidden>
+          </div>
+          <div class="tgrid" id="tgrid"></div>
+        </div>
+
+        <div class="sec" id="psec-train">
+          <h3>2. Train</h3>
+          <p class="sub">Training uses the whole graphics card, so making pictures pauses until it's done. Keep the black Image Studio window open; closing the browser is fine. Times are rough guesses for your card.</p>
+          <div class="lengths" id="lengths">
+            <button data-v="quick" aria-pressed="false"><b>Quick</b><small>600 steps · ~30–60 min · try it out</small></button>
+            <button data-v="standard" aria-pressed="true"><b>Standard</b><small>1000 steps · ~1–1.5 hr · recommended</small></button>
+            <button data-v="thorough" aria-pressed="false"><b>Thorough</b><small>1600 steps · ~1.5–2.5 hr · tricky characters</small></button>
+          </div>
+          <button class="btn-main" id="ptrain" style="width:100%">Train</button>
+          <div class="note" id="ptrain-note"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- New project -->
+<div class="modal" id="m-new" hidden role="dialog" aria-modal="true" aria-labelledby="m-new-t">
+  <div class="dialog">
+    <h3 id="m-new-t">New training project</h3>
+    <div><label class="h" for="np-name">Name <span>(what you'll see in the menu)</span></label><input type="text" id="np-name" placeholder="Zarik the wizard" maxlength="60"></div>
+    <div><label class="h" for="np-word">Code word <span>(a made-up word, no spaces)</span></label><input type="text" id="np-word" placeholder="zarikwiz" maxlength="24">
+      <div class="note">This word calls up your character in prompts. Use something that isn't a real word or name, like <b>zarikwiz</b>, so the engine doesn't mix it up with something it already knows.</div></div>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn gold" id="np-go">Create project</button></div>
+  </div>
+</div>
+
+<!-- Split a sheet -->
+<div class="modal" id="m-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="m-sheet-t">
+  <div class="dialog wide">
+    <h3 id="m-sheet-t">Split a reference sheet</h3>
+    <div id="sh-pick"><button class="btn gold" id="sh-choose">Choose the sheet</button><input type="file" id="sh-file" accept="image/*" hidden></div>
+    <div id="sh-work" hidden>
+      <div class="note" style="margin:0 0 8px">Drag a box around each view of the character: front, side, back, close-up, and so on. Leave labels and color swatches out of the boxes.</div>
+      <div class="cropwrap" id="sh-wrap"><img id="sh-img" alt="Reference sheet" draggable="false"></div>
+    </div>
+    <div class="row">
+      <span class="note" id="sh-count" style="margin-right:auto"></span>
+      <button class="btn" id="sh-undo" disabled>Undo last box</button>
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn gold" id="sh-save" disabled>Save pictures</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Picture details">
+  <div class="stage"><img id="lb-img" alt=""></div>
+  <aside>
+    <button class="btn close" id="lb-close">Close ✕</button>
+    <div class="p" id="lb-prompt"></div>
+    <div class="small" id="lb-meta"></div>
+    <div class="actions" id="lb-actions">
+      <button id="lb-more">Make more like this</button>
+      <button id="lb-reuse">Reuse prompt</button>
+      <a id="lb-dl" download>Download a copy</a>
+      <button id="lb-del" class="del">Delete</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const STYLE_NAMES = {none:"", illustration:"Illustration", watercolor:"Watercolor", photo:"Photo", fantasy:"Fantasy art", pixel:"Pixel art", comic:"Comic"};
+const SHAPE_RATIO = {square:"1 / 1", tall:"896 / 1152", wide:"1152 / 896"};
+let ready = false, busy = false, stopAsked = false, lbItem = null, models = [];
+
+const store = {
+  get(k, d){ try { const v = localStorage.getItem("studio."+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem("studio."+k, JSON.stringify(v)); } catch {} }
+};
+function toast(msg, bad){
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("bad", !!bad); t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, bad ? 7000 : 3200);
+}
+async function api(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body || {})});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Something went wrong.");
+  return data;
+}
+async function getJSON(path){ const r = await fetch(path); if (!r.ok) throw new Error("Couldn't load that."); return r.json(); }
+const imgURL = f => "/images/" + encodeURIComponent(f);
+
+// ---------- option groups
+function group(sel, key, def){
+  const box = $(sel);
+  const set = v => { box.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v))); store.set(key, v); };
+  box.addEventListener("click", e => { const b = e.target.closest("button"); if (b) set(b.dataset.v); });
+  set(store.get(key, def));
+  return { get: () => box.querySelector('[aria-pressed="true"]').dataset.v, set };
+}
+const style = group("#styles", "style", "none");
+const shape = group("#shapes", "shape", "square");
+const count = group("#count", "count", "1");
+const length = group("#lengths", "length", "standard");
+const promptBox = $("#prompt");
+promptBox.value = store.get("prompt", "");
+promptBox.addEventListener("input", () => store.set("prompt", promptBox.value));
+
+// ---------- tabs
+function showTab(name){
+  ["create","gallery","train"].forEach(n => {
+    $("#tab-"+n).setAttribute("aria-selected", String(n === name));
+    $("#view-"+n).hidden = n !== name;
+  });
+  if (name === "gallery") loadGallery();
+  if (name === "train") loadTrain();
+}
+["create","gallery","train"].forEach(n => $("#tab-"+n).onclick = () => showTab(n));
+
+// ---------- status
+let lastStatus = "", statusTimer = null;
+async function pollStatus(){
+  clearTimeout(statusTimer);
+  try {
+    const s = await getJSON("/api/status");
+    $("#status").className = "status " + s.status;
+    $("#status-text").textContent = s.status === "ready" ? ("Ready" + (s.mode && s.mode !== "fast" ? " · " + s.mode : "")) : s.message;
+    ready = s.status === "ready";
+    if (s.status === "error" && lastStatus !== "error") toast(s.message, true);
+    if (s.status === "ready" && lastStatus === "training") { loadModels(); toast("Training finished. Making pictures is back on."); }
+    lastStatus = s.status;
+    updateGo();
+    statusTimer = setTimeout(pollStatus, s.status === "ready" ? 8000 : 2500);
+  } catch {
+    $("#status").className = "status error";
+    $("#status-text").textContent = "Image Studio isn't running. Double-click “Start Image Studio”.";
+    ready = false; updateGo();
+    statusTimer = setTimeout(pollStatus, 4000);
+  }
+}
+function updateGo(){ $("#go").disabled = !ready || busy; }
+
+// ---------- models (Create)
+async function loadModels(){
+  try { models = await getJSON("/api/models"); } catch { models = []; }
+  const sel = $("#model"), cur = sel.value || store.get("model", "");
+  sel.innerHTML = '<option value="">Standard</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join("");
+  sel.value = models.some(m => m.slug === cur) ? cur : "";
+  modelChanged();
+  renderModelList();
+}
+function modelChanged(){
+  const m = models.find(x => x.slug === $("#model").value);
+  store.set("model", m ? m.slug : "");
+  $("#model-extra").hidden = !m;
+  if (m) $("#model-note").innerHTML = `Code word <span class="word">${esc(m.word)}</span> is added to your prompt for you. Lower the strength if pictures look stiff; raise it if the character doesn't look like itself.`;
+}
+$("#model").onchange = modelChanged;
+const strength = $("#strength");
+strength.value = store.get("strength", 1);
+const showStrength = () => { $("#strength-v").textContent = Number(strength.value).toFixed(2); store.set("strength", Number(strength.value)); };
+strength.oninput = showStrength; showStrength();
+
+// ---------- generate
+function makeCard(shapeName){
+  const c = document.createElement("article");
+  c.className = "card busy";
+  c.innerHTML = `<div class="pic" style="aspect-ratio:${SHAPE_RATIO[shapeName]}">Up next…</div><div class="meta"><div class="p"></div></div>`;
+  $("#grid").prepend(c);
+  $("#empty").hidden = true;
+  return c;
+}
+function fillCard(c, rec){
+  c.className = "card"; c.dataset.file = rec.file;
+  const pic = c.querySelector(".pic"); pic.innerHTML = "";
+  const img = new Image(); img.src = imgURL(rec.file); img.alt = rec.prompt; pic.appendChild(img);
+  pic.onclick = () => openLB(rec);
+  const meta = c.querySelector(".meta");
+  meta.innerHTML = `<div class="p"></div><div class="actions">
+      <button data-a="more">More like this</button>
+      <button data-a="reuse">Reuse prompt</button>
+      <a href="${imgURL(rec.file)}" download="${esc(rec.file)}">Download</a>
+      <button data-a="del" class="del" aria-label="Delete this picture">Delete</button>
+      <span class="secs">${rec.seconds}s</span></div>`;
+  meta.querySelector(".p").textContent = rec.prompt + (STYLE_NAMES[rec.style] ? " · " + STYLE_NAMES[rec.style] : "") + (rec.model_name ? " · " + rec.model_name : "");
+  meta.querySelector('[data-a="more"]').onclick = () => run(jobFrom(rec), Number(count.get()));
+  meta.querySelector('[data-a="reuse"]').onclick = () => reuse(rec);
+  meta.querySelector('[data-a="del"]').onclick = () => deletePictures([rec.file]);
+}
+const jobFrom = rec => ({prompt: rec.prompt, style: rec.style, shape: rec.shape, model: rec.model || "", strength: rec.strength ?? 1});
+function currentJob(){ return {prompt: promptBox.value, style: style.get(), shape: shape.get(), model: $("#model").value, strength: Number(strength.value)}; }
+
+async function run(job, n){
+  if (!ready || busy) { if (!ready) toast($("#status-text").textContent, true); return; }
+  if (!job.prompt.trim()){ toast("Type an idea first.", true); promptBox.focus(); return; }
+  busy = true; stopAsked = false; updateGo();
+  $("#stop").hidden = n < 2;
+  const cards = Array.from({length:n}, () => makeCard(job.shape)).reverse();
+  for (let i = 0; i < n; i++){
+    const c = cards[i];
+    if (stopAsked){ c.remove(); continue; }
+    c.querySelector(".pic").textContent = n > 1 ? `Painting ${i+1} of ${n}…` : "Painting…";
+    try { fillCard(c, await api("/api/generate", job)); }
+    catch (e){ c.className = "card failed"; c.querySelector(".pic").textContent = e.message; toast(e.message, true); }
+  }
+  busy = false; $("#stop").hidden = true; updateGo();
+  if (!$("#grid").children.length) $("#empty").hidden = false;
+}
+$("#go").onclick = () => run(currentJob(), Number(count.get()));
+$("#stop").onclick = () => { stopAsked = true; $("#stop").hidden = true; toast("Stopping after the current picture."); };
+promptBox.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("#go").click(); } });
+
+function reuse(rec){
+  closeLB(); showTab("create");
+  promptBox.value = rec.prompt; store.set("prompt", rec.prompt);
+  style.set(rec.style || "none"); shape.set(rec.shape || "square");
+  if (rec.model && models.some(m => m.slug === rec.model)) { $("#model").value = rec.model; if (rec.strength) { strength.value = rec.strength; showStrength(); } }
+  else $("#model").value = "";
+  modelChanged();
+  promptBox.focus(); toast("Prompt loaded. Change anything, then Generate.");
+}
+
+// ---------- delete pictures
+async function deletePictures(files){
+  if (!files.length) return;
+  const n = files.length;
+  if (!confirm(n === 1 ? "Move this picture to the Recycle Bin?" : `Move these ${n} pictures to the Recycle Bin?`)) return;
+  try {
+    await api("/api/delete-images", {files});
+    files.forEach(f => document.querySelectorAll(`.card[data-file="${CSS.escape(f)}"]`).forEach(c => c.remove()));
+    if (!$("#grid").children.length) $("#empty").hidden = false;
+    closeLB();
+    if (!$("#view-gallery").hidden) { exitSelect(); loadGallery(); }
+    toast(n === 1 ? "Moved to the Recycle Bin." : `${n} pictures moved to the Recycle Bin.`);
+  } catch (e){ toast(e.message, true); }
+}
+
+// ---------- gallery
+let gitems = [], selecting = false;
+const picked = new Set();
+async function loadGallery(){
+  try { gitems = await getJSON("/api/gallery"); } catch { gitems = []; toast("Couldn't load the gallery.", true); }
+  const g = $("#ggrid"); g.innerHTML = "";
+  $("#gempty").hidden = gitems.length > 0;
+  $("#gcount").textContent = gitems.length ? `${gitems.length} picture${gitems.length === 1 ? "" : "s"}` : "";
+  for (const rec of gitems){
+    const b = document.createElement("button");
+    b.className = "thumb"; b.title = rec.prompt; b.dataset.file = rec.file;
+    b.setAttribute("aria-pressed", String(picked.has(rec.file)));
+    b.innerHTML = `<span class="tick" aria-hidden="true">✓</span><img loading="lazy" alt="">` + (rec.model_name ? `<span class="tag">${esc(rec.model_name)}</span>` : "");
+    b.querySelector("img").src = imgURL(rec.file); b.querySelector("img").alt = rec.prompt;
+    b.onclick = () => selecting ? togglePick(b) : openLB(rec);
+    g.appendChild(b);
+  }
+}
+function togglePick(b){
+  const f = b.dataset.file;
+  picked.has(f) ? picked.delete(f) : picked.add(f);
+  b.setAttribute("aria-pressed", String(picked.has(f)));
+  updateSelBar();
+}
+function updateSelBar(){ $("#gsel-count").textContent = `${picked.size} selected`; $("#gsel-del").disabled = picked.size === 0; }
+function enterSelect(){ selecting = true; picked.clear(); $("#gpane").classList.add("selecting"); $("#gbar-normal").hidden = true; $("#gbar-select").hidden = false; updateSelBar(); loadGallery(); }
+function exitSelect(){ selecting = false; picked.clear(); $("#gpane").classList.remove("selecting"); $("#gbar-normal").hidden = false; $("#gbar-select").hidden = true; document.querySelectorAll(".thumb").forEach(t => t.setAttribute("aria-pressed","false")); }
+$("#gselect").onclick = enterSelect;
+$("#gsel-cancel").onclick = exitSelect;
+$("#gsel-all").onclick = () => { gitems.forEach(r => picked.add(r.file)); document.querySelectorAll(".thumb").forEach(t => t.setAttribute("aria-pressed","true")); updateSelBar(); };
+$("#gsel-del").onclick = () => deletePictures([...picked]);
+$("#openFolder").onclick = async () => {
+  try { const r = await api("/api/open-folder?which=images"); if (!r.ok) toast("Your pictures are in: " + r.path); }
+  catch (e){ toast(e.message, true); }
+};
+
+// ---------- lightbox
+let lastFocus = null;
+function openLB(rec, opts = {}){
+  lbItem = rec; lastFocus = document.activeElement;
+  $("#lb-img").src = opts.src || imgURL(rec.file);
+  $("#lb-img").alt = rec.prompt || "";
+  $("#lb-prompt").textContent = rec.prompt || "";
+  const when = rec.created ? new Date(rec.created).toLocaleString() : "";
+  $("#lb-meta").textContent = opts.meta ?? [rec.model_name, STYLE_NAMES[rec.style], rec.shape, when, rec.seconds ? rec.seconds + "s" : ""].filter(Boolean).join(" · ");
+  $("#lb-actions").hidden = !!opts.src;
+  $("#lb-dl").href = imgURL(rec.file || ""); $("#lb-dl").setAttribute("download", rec.file || "");
+  $("#lb").hidden = false; $("#lb-close").focus();
+}
+function closeLB(){ if ($("#lb").hidden) return; $("#lb").hidden = true; if (lastFocus) lastFocus.focus(); }
+$("#lb-close").onclick = closeLB;
+$("#lb").addEventListener("click", e => { if (e.target.id === "lb" || e.target.classList.contains("stage")) closeLB(); });
+$("#lb-reuse").onclick = () => reuse(lbItem);
+$("#lb-more").onclick = () => { const r = lbItem; closeLB(); showTab("create"); run(jobFrom(r), Number(count.get())); };
+$("#lb-del").onclick = () => deletePictures([lbItem.file]);
+
+// ---------- modals
+function openModal(id){ $(id).hidden = false; const f = $(id).querySelector("input,button.gold"); if (f) f.focus(); }
+function closeModal(id){ $(id).hidden = true; }
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeModal("#" + b.closest(".modal").id));
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (!$("#lb").hidden) return closeLB();
+  document.querySelectorAll(".modal").forEach(m => m.hidden = true);
+});
+
+// ======================= TRAIN =======================
+let projects = [], curSlug = store.get("project", ""), curProj = null, trainPoll = null;
+
+async function loadTrain(){
+  try { projects = await getJSON("/api/train/projects"); } catch { projects = []; }
+  renderProjectList();
+  await loadModels();
+  if (curSlug && projects.some(p => p.slug === curSlug)) await openProject(curSlug);
+  else { curSlug = ""; $("#proj").hidden = true; $("#tempty").hidden = false; }
+  checkTraining();
+}
+function renderProjectList(){
+  const l = $("#plist");
+  l.innerHTML = projects.length ? "" : '<div class="note" style="margin:0">No projects yet.</div>';
+  for (const p of projects){
+    const b = document.createElement("button");
+    b.className = "item"; b.setAttribute("aria-current", String(p.slug === curSlug));
+    b.innerHTML = `<span class="t"><b>${esc(p.name)}</b><small>${esc(p.word)} · ${p.count} picture${p.count === 1 ? "" : "s"}</small></span>`;
+    b.onclick = () => openProject(p.slug);
+    l.appendChild(b);
+  }
+}
+function renderModelList(){
+  const l = $("#mlist");
+  l.innerHTML = models.length ? "" : '<div class="note" style="margin:0">Finished models show up here.</div>';
+  for (const m of models){
+    const d = document.createElement("div");
+    d.className = "model";
+    d.innerHTML = `<b>${esc(m.name)}</b><small>code word ${esc(m.word)}${m.created ? " · " + new Date(m.created).toLocaleDateString() : ""}</small>
+      <div class="actions"><button data-a="use">Use</button><button data-a="ren">Rename</button><button data-a="del" class="del">Delete</button></div>`;
+    d.querySelector('[data-a="use"]').onclick = () => { showTab("create"); $("#model").value = m.slug; modelChanged(); promptBox.focus(); };
+    d.querySelector('[data-a="ren"]').onclick = async () => {
+      const n = prompt("New name for this model:", m.name); if (!n) return;
+      try { await api(`/api/models/${m.slug}/rename`, {name: n}); loadModels(); } catch (e){ toast(e.message, true); }
+    };
+    d.querySelector('[data-a="del"]').onclick = async () => {
+      if (!confirm(`Move the model “${m.name}” to the Recycle Bin? Pictures you already made with it stay.`)) return;
+      try { await api(`/api/models/${m.slug}/delete`); toast("Model moved to the Recycle Bin."); loadModels(); } catch (e){ toast(e.message, true); }
+    };
+    l.appendChild(d);
+  }
+}
+
+$("#pnew").onclick = () => { $("#np-name").value = ""; $("#np-word").value = ""; openModal("#m-new"); };
+$("#np-name").addEventListener("input", () => {
+  if ($("#np-word").dataset.touched) return;
+  const w = $("#np-name").value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+  $("#np-word").value = w ? w + "x" : "";
+});
+$("#np-word").addEventListener("input", () => { $("#np-word").dataset.touched = "1"; $("#np-word").value = $("#np-word").value.replace(/[^a-zA-Z0-9]/g, ""); });
+$("#np-go").onclick = async () => {
+  try {
+    const r = await api("/api/train/projects", {name: $("#np-name").value, word: $("#np-word").value});
+    delete $("#np-word").dataset.touched;
+    closeModal("#m-new");
+    projects = await getJSON("/api/train/projects");
+    await openProject(r.slug);
+  } catch (e){ toast(e.message, true); }
+};
+
+async function openProject(slug){
+  try { curProj = await getJSON(`/api/train/projects/${slug}`); } catch (e){ toast(e.message, true); return; }
+  curSlug = slug; store.set("project", slug);
+  renderProjectList();
+  $("#tempty").hidden = true; $("#proj").hidden = false;
+  $("#pname").textContent = curProj.name;
+  $("#pword").textContent = curProj.word;
+  renderImages();
+  renderProgress(curProj.progress, false);
+}
+function renderImages(){
+  const imgs = curProj.images;
+  $("#pcount").textContent = `(${imgs.length})`;
+  const g = $("#tgrid"); g.innerHTML = "";
+  for (const im of imgs){
+    const d = document.createElement("div");
+    d.className = "timg";
+    const small = Math.max(im.w, im.h) < 512;
+    d.innerHTML = `<div class="ph"><img alt="" loading="lazy"><button class="x" aria-label="Remove this picture">✕</button>${small ? '<span class="warn">small</span>' : ""}</div>
+      <input type="text" placeholder="caption (optional)" maxlength="200" aria-label="Caption">`;
+    d.querySelector("img").src = `/train-files/${curSlug}/images/${encodeURIComponent(im.file)}?v=${im.w}`;
+    const inp = d.querySelector("input"); inp.value = im.caption || "";
+    inp.addEventListener("change", async () => {
+      try { await api(`/api/train/projects/${curSlug}/caption`, {file: im.file, caption: inp.value}); im.caption = inp.value; }
+      catch (e){ toast(e.message, true); }
+    });
+    d.querySelector(".x").onclick = async () => {
+      try { await api(`/api/train/projects/${curSlug}/delete-image`, {file: im.file}); curProj.images = curProj.images.filter(x => x !== im); renderImages(); refreshProjectCounts(); }
+      catch (e){ toast(e.message, true); }
+    };
+    g.appendChild(d);
+  }
+  const n = imgs.length;
+  $("#ptrain-note").textContent = n < 5 ? `Add at least ${5 - n} more picture${5 - n === 1 ? "" : "s"} to train (15–40 works best).`
+    : n < 15 ? `You can train now, but ${15 - n} more would help it learn the character better.` : "";
+}
+async function refreshProjectCounts(){ try { projects = await getJSON("/api/train/projects"); renderProjectList(); } catch {} }
+
+$("#pdel").onclick = async () => {
+  if (!confirm(`Move the project “${curProj.name}” and its training pictures to the Recycle Bin? Finished models are kept.`)) return;
+  try { await api(`/api/train/projects/${curSlug}/delete`); curSlug = ""; store.set("project", ""); toast("Project moved to the Recycle Bin."); loadTrain(); }
+  catch (e){ toast(e.message, true); }
+};
+
+// ---- adding pictures
+function fileToDataURL(file, max = 1536){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL("image/png"));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error(file.name + " isn't a picture this app can read.")); };
+    img.src = url;
+  });
+}
+async function addFiles(files){
+  const list = [...files].filter(f => f.type.startsWith("image/"));
+  if (!list.length) return;
+  let done = 0;
+  for (const f of list){
+    toast(`Adding pictures… ${done + 1} of ${list.length}`);
+    try { await api(`/api/train/projects/${curSlug}/images`, {data: await fileToDataURL(f), label: f.name.replace(/\.[^.]+$/, "")}); done++; }
+    catch (e){ toast(e.message, true); }
+  }
+  await openProject(curSlug); refreshProjectCounts();
+  toast(`Added ${done} picture${done === 1 ? "" : "s"}.`);
+}
+$("#padd").onclick = () => $("#pfile").click();
+$("#pfile").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+
+// ---- split a sheet
+let boxes = [], drawing = null, sheetFile = null;
+$("#psheet").onclick = () => { boxes = []; sheetFile = null; $("#sh-pick").hidden = false; $("#sh-work").hidden = true; renderBoxes(); openModal("#m-sheet"); };
+$("#sh-choose").onclick = () => $("#sh-file").click();
+$("#sh-file").onchange = e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  sheetFile = f;
+  $("#sh-img").src = URL.createObjectURL(f);
+  $("#sh-pick").hidden = true; $("#sh-work").hidden = false;
+  boxes = []; renderBoxes();
+};
+const wrap = $("#sh-wrap");
+function rel(e){ const r = $("#sh-img").getBoundingClientRect(); return {x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))}; }
+wrap.addEventListener("pointerdown", e => { if (e.button !== 0) return; wrap.setPointerCapture(e.pointerId); const p = rel(e); drawing = {x0:p.x, y0:p.y, x1:p.x, y1:p.y}; renderBoxes(); });
+wrap.addEventListener("pointermove", e => { if (!drawing) return; const p = rel(e); drawing.x1 = p.x; drawing.y1 = p.y; renderBoxes(); });
+wrap.addEventListener("pointerup", () => {
+  if (!drawing) return;
+  const b = norm(drawing); drawing = null;
+  const im = $("#sh-img");
+  if (b.w * im.naturalWidth > 40 && b.h * im.naturalHeight > 40) boxes.push(b);
+  renderBoxes();
+});
+function norm(d){ return {x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0)}; }
+function renderBoxes(){
+  wrap.querySelectorAll(".box").forEach(b => b.remove());
+  const all = drawing ? [...boxes, norm(drawing)] : boxes;
+  all.forEach((b, i) => {
+    const el = document.createElement("div"); el.className = "box";
+    Object.assign(el.style, {left: b.x*100+"%", top: b.y*100+"%", width: b.w*100+"%", height: b.h*100+"%"});
+    if (i < boxes.length) el.innerHTML = `<span>${i + 1}</span>`;
+    wrap.appendChild(el);
+  });
+  $("#sh-count").textContent = boxes.length ? `${boxes.length} box${boxes.length === 1 ? "" : "es"}` : "";
+  $("#sh-undo").disabled = !boxes.length; $("#sh-save").disabled = !boxes.length;
+}
+$("#sh-undo").onclick = () => { boxes.pop(); renderBoxes(); };
+$("#sh-save").onclick = async () => {
+  const im = $("#sh-img"), W = im.naturalWidth, H = im.naturalHeight;
+  $("#sh-save").disabled = true;
+  try {
+    await api(`/api/train/projects/${curSlug}/images`, {data: await fileToDataURL(sheetFile, 4096), kind: "sheet"});
+    for (let i = 0; i < boxes.length; i++){
+      const b = boxes[i], c = document.createElement("canvas");
+      c.width = Math.round(b.w * W); c.height = Math.round(b.h * H);
+      c.getContext("2d").drawImage(im, b.x * W, b.y * H, c.width, c.height, 0, 0, c.width, c.height);
+      toast(`Saving view ${i + 1} of ${boxes.length}…`);
+      await api(`/api/train/projects/${curSlug}/images`, {data: c.toDataURL("image/png"), label: "sheet-view"});
+    }
+    closeModal("#m-sheet");
+    await openProject(curSlug); refreshProjectCounts();
+    toast(`Saved ${boxes.length} view${boxes.length === 1 ? "" : "s"}. Add captions like “front view” or “back view” if you like.`);
+  } catch (e){ toast(e.message, true); }
+  $("#sh-save").disabled = false;
+};
+
+// ---- training
+$("#ptrain").onclick = async () => {
+  const again = models.some(m => m.slug === curSlug);
+  if (!confirm((again ? "This project already has a finished model. Training again will REPLACE it when the new one finishes.\n\n" : "") + "Start training? Making pictures will pause until it finishes. Keep the black Image Studio window open.")) return;
+  try {
+    await api(`/api/train/projects/${curSlug}/start`, {length: length.get()});
+    toast("Training started.");
+    renderProgress({status: "starting", message: "Getting ready…", step: 0, total: 0, samples: []}, true);
+    $("#tpane").scrollTo({top: 0, behavior: "smooth"});
+    checkTraining(); pollStatus();
+  } catch (e){ toast(e.message, true); }
+};
+$("#pg-keep").onclick = async () => { if (!confirm("Stop now and save what it has learned so far?")) return; try { await api("/api/train/stop", {keep: true}); toast("Stopping and saving…"); } catch (e){ toast(e.message, true); } };
+$("#pg-stop").onclick = async () => { if (!confirm("Stop training and throw away what it learned?")) return; try { await api("/api/train/stop", {keep: false}); toast("Stopping…"); } catch (e){ toast(e.message, true); } };
+$("#pg-use").onclick = async () => { await loadModels(); showTab("create"); const slug = curSlug; if (models.some(m => m.slug === slug)) { $("#model").value = slug; modelChanged(); } promptBox.focus(); };
+
+const fmtTime = s => s == null ? "—" : s < 60 ? "under a minute" : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} hr ${Math.round((s % 3600) / 60)} min`;
+function renderProgress(p, active){
+  const sec = $("#psec-progress");
+  if (!p){ sec.hidden = true; $("#psec-train").hidden = false; return; }
+  sec.hidden = false;
+  const running = active && !["done","cancelled","error"].includes(p.status);
+  $("#psec-train").hidden = running;
+  $("#pg-title").textContent = {done:"Training finished", cancelled:"Training stopped", error:"Training stopped"}[p.status] || "Training…";
+  const m = $("#pg-msg"); m.textContent = p.message || ""; m.className = "msg" + (p.status === "error" ? " bad" : p.status === "done" ? " good" : "");
+  const pct = p.total ? Math.round(100 * p.step / p.total) : 0;
+  $("#pg-bar").style.width = (p.status === "done" ? 100 : pct) + "%";
+  $("#pg-step").textContent = p.step || 0; $("#pg-total").textContent = p.total || 0;
+  $("#pg-eta").textContent = running ? fmtTime(p.eta_s) : "—";
+  $("#pg-loss").textContent = p.loss ?? "—";
+  $("#pg-running-actions").hidden = !running;
+  $("#pg-done-actions").hidden = p.status !== "done";
+  const s = $("#pg-samples"); s.innerHTML = "";
+  [...(p.samples || [])].reverse().forEach(g => g.files.forEach((f, k) => {
+    const fig = document.createElement("figure");
+    const src = `/train-files/${curSlug}/samples/${encodeURIComponent(f)}`;
+    fig.innerHTML = `<img alt="Sample at step ${g.step}"><figcaption>step ${g.step} · ${k === 0 ? "full body" : "portrait"}</figcaption>`;
+    fig.querySelector("img").src = src;
+    fig.querySelector("img").onclick = () => openLB({prompt: `Sample at step ${g.step}`}, {src, meta: "Training sample"});
+    s.appendChild(fig);
+  }));
+}
+async function checkTraining(){
+  clearTimeout(trainPoll);
+  let t;
+  try { t = await getJSON("/api/train/status"); } catch { trainPoll = setTimeout(checkTraining, 5000); return; }
+  if (t.active){
+    if (t.active === curSlug && !$("#view-train").hidden) renderProgress(t.progress, true);
+    else if (curSlug && t.active !== curSlug && !$("#view-train").hidden) { $("#ptrain").disabled = true; $("#ptrain-note").textContent = "Another project is training right now."; }
+    trainPoll = setTimeout(checkTraining, 3000);
+  } else {
+    $("#ptrain").disabled = false;
+    if (curSlug && !$("#view-train").hidden){
+      try { const pj = await getJSON(`/api/train/projects/${curSlug}`); renderProgress(pj.progress, false); } catch {}
+    }
+    loadModels();
+  }
+}
+
+loadModels();
+pollStatus();
+</script>
+</body>
+</html>

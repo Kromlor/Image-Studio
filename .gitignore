@@ -1,0 +1,18 @@
+# Everything personal or huge stays on the PC, never on GitHub
+models/
+venv/
+My Images/
+My Models/
+Training/
+pip-cache/
+tmp/
+_backup_*/
+*.log
+studio_log.txt
+train_log.txt
+*.safetensors
+*.png
+*.jpg
+*.jpeg
+*.webp
+.env

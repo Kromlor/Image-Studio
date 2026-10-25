@@ -1,0 +1,36 @@
+IMAGE STUDIO v2.0
+=================
+
+FIRST TIME ONLY
+  1. Double-click "Install Image Studio" (already done on this PC).
+
+EVERY TIME
+  2. Double-click "Start Image Studio".
+     Your browser opens to the app. Keep the black window open while
+     you use it; close that window to shut the app down.
+     After an update, the first start installs new parts (needs internet once).
+
+SCREENS
+  Create   Type an idea, pick a style/shape, Generate. Pick one of your
+           trained models in the Model menu to put your character in a scene.
+  Gallery  Everything you've made. Click a picture for details. "Select" lets
+           you delete several at once. Deleted pictures go to the Recycle Bin.
+  Train    Teach the app your own character: new project > add 15-40 pictures
+           (or split a reference sheet) > Train. Takes about 1-3 hours.
+
+FOLDERS
+  My Images   your pictures (each stores the prompt that made it)
+  Training    your training projects and their pictures
+  My Models   your finished trained models
+
+PRIVATE
+  Runs only on this PC. Making pictures never uses the internet.
+  (Training downloads a small add-on once, the first time you train.)
+
+IF SOMETHING GOES WRONG
+  Send Claude a screenshot of the black window, or studio_log.txt
+  (or train_log.txt inside a project folder for training problems).
+
+ENGINE
+  FLUX.1 Schnell by Black Forest Labs, Apache 2.0 license. Training add-on
+  ostris/FLUX.1-schnell-training-adapter, Apache 2.0.
