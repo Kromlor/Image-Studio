@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Image Studio v2.2</title>
+<title>Image Studio v2.3</title>
 <style>
   :root{
     --bg:#121016; --panel:#1b1821; --panel-2:#24202c; --line:#34303d;
@@ -201,7 +201,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.2</small></div>
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.3</small></div>
   <nav role="tablist" aria-label="Screens">
     <button role="tab" id="tab-create" aria-selected="true" aria-controls="view-create">Create</button>
     <button role="tab" id="tab-characters" aria-selected="false" aria-controls="view-characters">Characters</button>
@@ -282,6 +282,9 @@
       <div class="sec">
         <div class="form" id="cform">
           <label class="full">Name <input type="text" data-f="name" placeholder="Janine" maxlength="60"></label>
+          <label>Trained model (code word) <select data-f="model" id="c-model"><option value="">None: build the look below</option></select></label>
+          <label id="c-str-wrap" hidden>Strength <span style="display:flex;gap:8px;align-items:center"><input type="range" data-f="mstrength" min="0.3" max="1.5" step="0.05" value="1" style="flex:1;accent-color:var(--gold)"><b id="c-str-v">1.00</b></span></label>
+          <div class="full note" id="c-model-note" hidden style="margin:-4px 0 0">Your trained model supplies the face, hair, and body, so those options are turned off. Pick the outfit, pose, setting, and style below.</div>
           <label>Gender <select data-f="gender"><option>woman</option><option>man</option><option>nonbinary person</option></select></label>
           <label>Age <select data-f="age"><option>early 20s</option><option selected>late 20s</option><option>30s</option><option>40s</option><option>50s</option><option>60s</option><option>70s</option></select></label>
           <label>Height <select data-f="height"><option>short</option><option selected>average height</option><option>tall</option></select></label>
@@ -640,6 +643,10 @@ async function loadModels(){
   const sel = $("#model"), cur = sel.value || store.get("model", "");
   sel.innerHTML = '<option value="">Standard</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join("");
   sel.value = models.some(m => m.slug === cur) ? cur : "";
+  const cm = $("#c-model"), cmCur = cm.value;
+  cm.innerHTML = '<option value="">None: build the look below</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)} (${esc(m.word)})</option>`).join("");
+  cm.value = models.some(m => m.slug === cmCur) ? cmCur : "";
+  if (typeof charUI === "function") charUI();
   const scs = $("#sc-model"), scCur = scs.value || store.get("scmodel", "");
   scs.innerHTML = '<option value="">Standard</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join("");
   scs.value = models.some(m => m.slug === scCur) ? scCur : "";
@@ -1182,7 +1189,10 @@ function charOutfit(f){
   if (f.outfitstyle === "custom") return f.outfitcustom.trim();
   return f.outfitstyle + (f.outfitcolors.trim() ? ` in ${f.outfitcolors.trim()}` : "");
 }
+const LOOK_FIELDS = ["gender","age","height","build","skin","face","eyes","makeup","hairstyle","haircolor","haircustom","bangs","freckles","glasses","tattoos","piercings","beard"];
 function charLook(f){
+  const tm = models.find(m => m.slug === f.model);
+  if (tm) { const o = charOutfit(f); return tm.word + (o ? ", wearing " + o : ""); }
   const hair = (f.haircolor === "custom" ? (f.haircustom.trim() || "brown") : f.haircolor);
   const parts = [`${f.gender === "nonbinary person" ? "a nonbinary person" : "a " + f.gender} in their ${f.age}`.replace("their", f.gender === "woman" ? "her" : f.gender === "man" ? "his" : "their"),
     f.height, `${f.build} build`, `${f.face} face`, `${f.skin} skin`];
@@ -1206,6 +1216,10 @@ function charUI(){
   $("#c-olib-wrap").hidden = f.outfitstyle !== "library";
   $("#c-ocustom-wrap").hidden = f.outfitstyle !== "custom";
   cf("outfitcolors").disabled = f.outfitstyle === "library" || f.outfitstyle === "custom";
+  const usingModel = !!models.find(m => m.slug === f.model);
+  LOOK_FIELDS.forEach(k => { const el = cf(k); if (el) { el.disabled = usingModel; el.closest("label").style.opacity = usingModel ? .45 : 1; } });
+  $("#c-str-wrap").hidden = !usingModel; $("#c-model-note").hidden = !usingModel;
+  $("#c-str-v").textContent = Number(f.mstrength || 1).toFixed(2);
   $("#cprompt").textContent = charPrompt(f);
 }
 $("#cform").addEventListener("input", charUI); $("#cform").addEventListener("change", charUI);
@@ -1238,8 +1252,11 @@ $("#cdel").onclick = async () => {
   if (!curChar || !confirm("Delete this character card? Pictures you made stay in the Gallery.")) return;
   try { await api(`/api/characters/${curChar}/delete`); curChar = ""; $("#cdel").hidden = true; $("#cnew").click(); toast("Character deleted."); } catch (e){ toast(e.message, true); }
 };
-function charJob(pose){ const f = charFields(); return {prompt: charPrompt(f, pose), style: f.style, shape: f.shape, model: "", strength: 1, outfit: "", outfit_name: ""}; }
-$("#cto").onclick = () => { const j = charJob(); showTab("create"); promptBox.value = j.prompt; store.set("prompt", j.prompt); style.set(j.style); shape.set(j.shape); $("#model").value = ""; modelChanged(); $("#outfit").value = ""; showOutfitText(); toast("Character sent to Create."); };
+function charJob(pose){ const f = charFields(); const tm = models.find(m => m.slug === f.model);
+  return {prompt: charPrompt(f, pose), style: f.style, shape: f.shape, model: tm ? tm.slug : "", strength: tm ? Number(f.mstrength || 1) : 1, outfit: "", outfit_name: ""}; }
+$("#cto").onclick = () => { const j = charJob(); showTab("create"); promptBox.value = j.prompt; store.set("prompt", j.prompt); style.set(j.style); shape.set(j.shape);
+  $("#model").value = j.model; modelChanged(); if (j.model) { strength.value = j.strength; showStrength(); }
+  $("#outfit").value = ""; showOutfitText(); toast("Character sent to Create."); };
 $("#cgen").onclick = () => { showTab("create"); run(charJob(), Number(count.get())); };
 $("#cset").onclick = async () => {
   if (!confirm("Make 12 pictures of this character in different poses and places? It takes a few minutes.")) return;

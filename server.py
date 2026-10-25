@@ -1,5 +1,5 @@
 """
-Riley's Image Studio v2.2
+Riley's Image Studio v2.3
 A private image generator that runs only on this PC (address 127.0.0.1 = this computer only).
 Engine: FLUX.1 Schnell (open weights, Apache-2.0). Trains your own character models (LoRA).
 """
@@ -22,7 +22,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "2.2"
+VERSION = "2.3"
 APP_DIR = Path(__file__).resolve().parent
 MODELS_DIR = APP_DIR / "models"
 IMAGES_DIR = APP_DIR / "My Images"
