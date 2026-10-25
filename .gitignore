@@ -16,3 +16,8 @@ train_log.txt
 *.jpeg
 *.webp
 .env
+Outfits/
+Characters/
+Scenes/
+console_log.txt
+reader_log.txt

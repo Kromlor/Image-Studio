@@ -1,4 +1,4 @@
-IMAGE STUDIO v2.0
+IMAGE STUDIO v2.1
 =================
 
 FIRST TIME ONLY
@@ -6,15 +6,22 @@ FIRST TIME ONLY
 
 EVERY TIME
   2. Double-click "Start Image Studio".
-     Your browser opens to the app. Keep the black window open while
-     you use it; close that window to shut the app down.
+     Your browser opens to the app. Image Studio runs hidden, with a small
+     purple icon by the clock (click ^ if you don't see it).
+     Right-click the icon to reopen the app, open your folders, or Quit.
      After an update, the first start installs new parts (needs internet once).
+     Troubleshooting: "Start Image Studio (show window)" runs it the old way.
 
 SCREENS
   Create   Type an idea, pick a style/shape, Generate. Pick one of your
            trained models in the Model menu to put your character in a scene.
+  Characters  Build a character by picking options (hair, eyes, build,
+           outfit...). Save it, make pictures, or make a 12-picture training set.
+  Scene    Upload a background, drag a box, and put a character into it.
+  Outfits  On Create or Scene, "Copy an outfit" reads the clothes in a picture
+           you upload and adds them to your prompt (one-time ~6 GB download).
   Gallery  Everything you've made. Click a picture for details. "Select" lets
-           you delete several at once. Deleted pictures go to the Recycle Bin.
+           you delete several at once or add them to a training project. Deleted pictures go to the Recycle Bin.
   Train    Teach the app your own character: new project > add 15-40 pictures
            (or split a reference sheet) > Train. Takes about 1-3 hours.
 
@@ -22,6 +29,9 @@ FOLDERS
   My Images   your pictures (each stores the prompt that made it)
   Training    your training projects and their pictures
   My Models   your finished trained models
+  Outfits     your saved outfits
+  Characters  your saved character cards
+  Scenes      backgrounds you've uploaded
 
 PRIVATE
   Runs only on this PC. Making pictures never uses the internet.
@@ -33,4 +43,5 @@ IF SOMETHING GOES WRONG
 
 ENGINE
   FLUX.1 Schnell by Black Forest Labs, Apache 2.0 license. Training add-on
-  ostris/FLUX.1-schnell-training-adapter, Apache 2.0.
+  ostris/FLUX.1-schnell-training-adapter, Apache 2.0. Outfit reader:
+  Qwen2.5-VL 7B Instruct, Apache 2.0.

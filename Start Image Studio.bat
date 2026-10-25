@@ -21,10 +21,15 @@ if errorlevel 1 goto :updatefail
 copy /y requirements.txt "venv\installed-requirements.txt" >nul
 
 :start
+rem ---- runs hidden, with a small icon by the clock (right-click it to quit) ----
+"venv\Scripts\python.exe" -c "import pystray" >nul 2>&1
+if errorlevel 1 goto :window
+start "" "venv\Scripts\pythonw.exe" server.py --tray
+exit /b 0
+
+:window
 echo.
-echo  Image Studio is running. Your browser will open in a moment.
-echo  Keep this window open while you use it.
-echo  Close this window to shut Image Studio down.
+echo  Running with the window showing. Keep this window open while you use it.
 echo.
 "venv\Scripts\python.exe" server.py
 if errorlevel 1 pause
@@ -34,4 +39,5 @@ exit /b 0
 echo.
 echo  The update couldn't finish - check your internet connection.
 echo  Starting with what's already installed...
+timeout /t 5 >nul
 goto :start

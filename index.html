@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Image Studio v2.0</title>
+<title>Image Studio v2.1</title>
 <style>
   :root{
     --bg:#121016; --panel:#1b1821; --panel-2:#24202c; --line:#34303d;
@@ -37,7 +37,30 @@
   .status .lamp{flex:none;width:11px;height:11px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px #f2b84b33}
   .status.ready .lamp{background:var(--good);box-shadow:0 0 0 3px #6fd39a33}
   .status.error .lamp{background:var(--bad);box-shadow:0 0 0 3px #ff7a6b33}
-  .status.training .lamp{background:var(--violet);box-shadow:0 0 0 3px #9b7bff33}
+  .status.training .lamp,.status.busy .lamp{background:var(--violet);box-shadow:0 0 0 3px #9b7bff33}
+  .outfit-row{display:flex;gap:8px}
+  .outfit-row select{flex:1}
+  .outfit-text{margin-top:8px;font-size:14px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .ogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .ocard{border:1px solid var(--line);background:var(--bg);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .ocard img,.ocard .noimg{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#0c0a0f}
+  .ocard b{padding:6px 10px 0;font-size:15px}
+  .ocard small{padding:0 10px;color:var(--ink-3);font-size:12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .ocard .actions{padding:8px 10px}
+  .ocard .actions button{font-size:13px;padding:4px 8px}
+  .preview{max-width:100%;max-height:40vh;border-radius:12px;display:block;align-self:center}
+  .spinner{display:flex;align-items:center;gap:10px;color:var(--ink-2)}
+  .spinner i{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--gold);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .form label{font-size:14px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+  .form label.full{grid-column:1/-1}
+  .checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:15px}
+  .form .checks label{display:flex;flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:15px}
+  .ptext{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;color:var(--ink-2)}
+  .cards{display:flex;flex-direction:column;gap:6px}
+  .stage-wrap{display:grid;place-items:center;background:#0c0a0f;border:1px solid var(--line);border-radius:var(--r);padding:12px;min-height:300px}
+  .stage-wrap .cropwrap img{max-height:60vh}
 
   main{flex:1;min-height:0;display:flex}
   .view{flex:1;min-height:0;display:flex}
@@ -176,9 +199,11 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.0</small></div>
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Image Studio <small>v2.1</small></div>
   <nav role="tablist" aria-label="Screens">
     <button role="tab" id="tab-create" aria-selected="true" aria-controls="view-create">Create</button>
+    <button role="tab" id="tab-characters" aria-selected="false" aria-controls="view-characters">Characters</button>
+    <button role="tab" id="tab-scene" aria-selected="false" aria-controls="view-scene">Scene</button>
     <button role="tab" id="tab-gallery" aria-selected="false" aria-controls="view-gallery">Gallery</button>
     <button role="tab" id="tab-train" aria-selected="false" aria-controls="view-train">Train</button>
   </nav>
@@ -200,6 +225,11 @@
       <div>
         <label class="h" for="prompt">Your idea</label>
         <textarea id="prompt" placeholder="A dragon made of autumn leaves curled around a lighthouse at sunset…"></textarea>
+      </div>
+      <div>
+        <label class="h" for="outfit">Outfit <span>(optional)</span></label>
+        <div class="outfit-row"><select id="outfit" class="outfit-select"><option value="">None</option></select><button class="btn" data-copy-outfit>Copy an outfit…</button></div>
+        <div class="outfit-text" id="outfit-text" hidden></div>
       </div>
       <div>
         <label class="h">Style <span>(optional)</span></label>
@@ -242,6 +272,104 @@
     </div>
   </section>
 
+  <!-- ======================= CHARACTERS ======================= -->
+  <section class="view" id="view-characters" role="tabpanel" aria-labelledby="tab-characters" hidden>
+    <div class="side">
+      <div>
+        <label class="h">Saved characters</label>
+        <div class="cards" id="clist"></div>
+        <button class="btn" id="cnew" style="margin-top:10px;width:100%">+ Start a new character</button>
+      </div>
+      <div class="note">Characters are adults. Build one here, then make pictures of them, or make a whole training set in one click.</div>
+    </div>
+    <div class="pane">
+      <div class="topbar"><h2>Character Creator</h2><span class="sp"></span>
+        <button class="btn bad" id="cdel" hidden>Delete character</button></div>
+      <div class="sec">
+        <div class="form" id="cform">
+          <label class="full">Name <input type="text" data-f="name" placeholder="Janine" maxlength="60"></label>
+          <label>Gender <select data-f="gender"><option>woman</option><option>man</option><option>nonbinary person</option></select></label>
+          <label>Age <select data-f="age"><option>early 20s</option><option selected>late 20s</option><option>30s</option><option>40s</option><option>50s</option><option>60s</option><option>70s</option></select></label>
+          <label>Height <select data-f="height"><option>short</option><option selected>average height</option><option>tall</option></select></label>
+          <label>Build <select data-f="build"><option>slim</option><option>athletic</option><option selected>average</option><option>curvy</option><option>muscular</option><option>heavyset</option></select></label>
+          <label>Skin tone <select data-f="skin"><option>very fair</option><option>fair</option><option selected>light tan</option><option>olive</option><option>medium brown</option><option>deep brown</option><option>dark</option></select></label>
+          <label>Face shape <select data-f="face"><option selected>oval</option><option>round</option><option>heart-shaped</option><option>square</option><option>long</option></select></label>
+          <label>Eye color <select data-f="eyes"><option>blue</option><option>green</option><option>hazel</option><option selected>brown</option><option>dark brown</option><option>gray</option><option>amber</option></select></label>
+          <label>Makeup <select data-f="makeup"><option selected>no makeup</option><option>natural makeup</option><option>bold makeup</option></select></label>
+          <label>Hair style <select data-f="hairstyle"><option>long straight</option><option selected>long wavy</option><option>long curly</option><option>shoulder-length</option><option>bob-cut</option><option>pixie-cut</option><option>braided</option><option>ponytail</option><option>high bun</option><option>messy bun</option><option>afro</option><option>short tousled</option><option>buzz-cut</option><option>shaved</option></select></label>
+          <label>Hair color <select data-f="haircolor"><option>black</option><option>dark brown</option><option selected>brown</option><option>auburn</option><option>red</option><option>copper</option><option>blonde</option><option>platinum blonde</option><option>silver</option><option>white</option><option>pink</option><option>pastel blue</option><option>purple</option><option>green</option><option value="custom">custom…</option></select></label>
+          <label hidden id="c-custom-wrap">Custom hair color <input type="text" data-f="haircustom" placeholder="e.g. teal with black tips" maxlength="60"></label>
+          <label>Bangs <select data-f="bangs"><option selected>no bangs</option><option>curtain bangs</option><option>straight bangs</option><option>side-swept bangs</option></select></label>
+          <div class="full checks">
+            <label><input type="checkbox" data-f="freckles"> Freckles</label>
+            <label><input type="checkbox" data-f="glasses"> Glasses</label>
+            <label><input type="checkbox" data-f="tattoos"> Tattoos</label>
+            <label><input type="checkbox" data-f="piercings"> Piercings</label>
+            <label><input type="checkbox" data-f="beard"> Beard</label>
+          </div>
+          <label>Outfit <select data-f="outfitstyle"><option>casual jeans and t-shirt</option><option>cozy sweater and leggings</option><option>business suit</option><option>elegant evening dress</option><option>sporty athletic wear</option><option>streetwear</option><option>fantasy adventurer leather armor</option><option>wizard robes</option><option>knight in plate armor</option><option>sci-fi jumpsuit</option><option value="library">from my outfit library…</option><option value="custom">describe my own…</option></select></label>
+          <label>Outfit colors <input type="text" data-f="outfitcolors" placeholder="e.g. navy and white" maxlength="60"></label>
+          <label class="full" hidden id="c-olib-wrap">Outfit from library <select data-f="outfitlib" class="outfit-select"><option value="">(choose one)</option></select></label>
+          <label class="full" hidden id="c-ocustom-wrap">Your outfit <input type="text" data-f="outfitcustom" placeholder="e.g. green flannel shirt, cargo pants, hiking boots" maxlength="200"></label>
+          <label>Pose <select data-f="pose"><option selected>standing, full body</option><option>sitting</option><option>walking</option><option>head and shoulders portrait</option><option>action pose</option><option>leaning against a wall</option></select></label>
+          <label>Lighting <select data-f="lighting"><option selected>soft natural light</option><option>golden hour sunlight</option><option>studio lighting</option><option>moody evening light</option><option>neon city lights</option><option>candlelight</option></select></label>
+          <label class="full">Setting <input type="text" data-f="setting" placeholder="e.g. a cozy coffee shop" maxlength="120"></label>
+          <label class="full">Extra details <span style="font-size:12px;color:var(--ink-3)">(optional)</span><input type="text" data-f="extra" placeholder="e.g. holding a sketchbook, smiling" maxlength="200"></label>
+          <label>Art style <select data-f="style"><option value="none">None</option><option value="illustration">Illustration</option><option value="watercolor">Watercolor</option><option value="photo" selected>Photo</option><option value="fantasy">Fantasy art</option><option value="pixel">Pixel art</option><option value="comic">Comic</option></select></label>
+          <label>Shape <select data-f="shape"><option value="tall" selected>Tall</option><option value="square">Square</option><option value="wide">Wide</option></select></label>
+        </div>
+      </div>
+      <div class="sec">
+        <h3>Prompt it writes</h3>
+        <div class="ptext" id="cprompt"></div>
+        <div class="actions" style="margin-top:12px">
+          <button id="cgen" style="background:var(--gold);color:var(--gold-ink);border-color:var(--gold);font-weight:700">Make pictures</button>
+          <button id="csave">Save character</button>
+          <button id="cto">Send to Create</button>
+          <button id="cset">Make a training set (12 pictures)</button>
+        </div>
+        <div class="note">A training set makes 12 pictures in different poses and places. Faces drift a little between pictures, so delete the ones that don't look like the same person before training.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= SCENE ======================= -->
+  <section class="view" id="view-scene" role="tabpanel" aria-labelledby="tab-scene" hidden>
+    <div class="side">
+      <div>
+        <label class="h">1. Background</label>
+        <button class="btn" id="sc-pick" style="width:100%">Choose a background picture</button>
+        <input type="file" id="sc-file" accept="image/*" hidden>
+        <div class="note">Then drag a box on it where the character should be.</div>
+      </div>
+      <div>
+        <label class="h" for="sc-model">2. Who goes in the box</label>
+        <select id="sc-model"><option value="">Standard</option></select>
+        <textarea id="sc-prompt" style="min-height:90px;margin-top:8px" placeholder="sitting at the table, reading a book, smiling"></textarea>
+      </div>
+      <div>
+        <label class="h" for="sc-outfit">Outfit <span>(optional)</span></label>
+        <div class="outfit-row"><select id="sc-outfit" class="outfit-select"><option value="">None</option></select><button class="btn" data-copy-outfit>Copy…</button></div>
+      </div>
+      <div>
+        <label class="h" for="sc-style">Style</label>
+        <select id="sc-style"><option value="none">Match the background</option><option value="photo">Photo</option><option value="illustration">Illustration</option><option value="watercolor">Watercolor</option><option value="fantasy">Fantasy art</option><option value="comic">Comic</option><option value="pixel">Pixel art</option></select>
+      </div>
+      <div class="go">
+        <button class="btn-main" id="sc-go" disabled>Place in scene</button>
+        <div class="hint">The background outside the box stays exactly as it was.</div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="stage-wrap" id="sc-stage">
+        <div class="empty" id="sc-empty"><div><b>Put your character into any picture</b>Choose a background on the left (a room, a street, a beach…).</div></div>
+        <div class="cropwrap" id="sc-wrap" hidden><img id="sc-img" alt="Background" draggable="false"></div>
+      </div>
+      <div class="actions" style="margin:10px 0 18px"><button id="sc-clear" hidden>Clear box</button></div>
+      <div class="grid" id="sc-grid"></div>
+    </div>
+  </section>
+
   <!-- ======================= GALLERY ======================= -->
   <section class="view" id="view-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
     <div class="pane" id="gpane">
@@ -255,6 +383,7 @@
         <h2 id="gsel-count">0 selected</h2>
         <span class="sp"></span>
         <button class="btn" id="gsel-all">Select all</button>
+        <button class="btn" id="gsel-train" disabled>Add to training project</button>
         <button class="btn bad" id="gsel-del" disabled>Delete</button>
         <button class="btn" id="gsel-cancel">Done</button>
       </div>
@@ -328,6 +457,47 @@
     </div>
   </section>
 </main>
+
+<!-- Copy an outfit -->
+<div class="modal" id="m-outfit" hidden role="dialog" aria-modal="true" aria-labelledby="m-outfit-t">
+  <div class="dialog">
+    <h3 id="m-outfit-t">Copy an outfit</h3>
+    <div id="mo-pick"><p class="note" style="margin:0 0 10px">Upload a picture of the clothes: a product photo, a screenshot, or someone wearing them. Only the clothing gets described.</p><button class="btn gold" id="mo-choose">Choose a picture</button><input type="file" id="mo-file" accept="image/*" hidden></div>
+    <img class="preview" id="mo-img" alt="" hidden>
+    <div class="spinner" id="mo-wait" hidden><i></i><span id="mo-msg">Reading…</span></div>
+    <div class="msg bad" id="mo-err" hidden></div>
+    <div id="mo-result" hidden>
+      <label class="h" for="mo-text">Description <span>(edit anything)</span></label>
+      <textarea id="mo-text" style="min-height:110px"></textarea>
+      <label class="h" for="mo-name" style="margin-top:10px">Name it to save it</label>
+      <input type="text" id="mo-name" placeholder="Denim jacket outfit" maxlength="60">
+    </div>
+    <div class="row">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn" id="mo-once" hidden>Use once</button>
+      <button class="btn gold" id="mo-save" hidden>Save and use</button>
+    </div>
+    <div id="mo-lib">
+      <label class="h" style="margin-top:6px">Your outfit library</label>
+      <div class="ogrid" id="mo-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add to training project -->
+<div class="modal" id="m-addtrain" hidden role="dialog" aria-modal="true" aria-labelledby="m-addtrain-t">
+  <div class="dialog">
+    <h3 id="m-addtrain-t">Add pictures to a training project</h3>
+    <p class="note" id="at-count" style="margin:0"></p>
+    <label class="h" for="at-proj">Project</label>
+    <select id="at-proj"></select>
+    <div id="at-new" hidden>
+      <label class="h" for="at-name" style="margin-top:6px">New project name</label><input type="text" id="at-name" maxlength="60">
+      <label class="h" for="at-word" style="margin-top:6px">Code word <span>(made-up, no spaces)</span></label><input type="text" id="at-word" maxlength="24">
+    </div>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn gold" id="at-go">Add pictures</button></div>
+  </div>
+</div>
 
 <!-- New project -->
 <div class="modal" id="m-new" hidden role="dialog" aria-modal="true" aria-labelledby="m-new-t">
@@ -418,14 +588,16 @@ promptBox.addEventListener("input", () => store.set("prompt", promptBox.value));
 
 // ---------- tabs
 function showTab(name){
-  ["create","gallery","train"].forEach(n => {
+  TABS.forEach(n => {
     $("#tab-"+n).setAttribute("aria-selected", String(n === name));
     $("#view-"+n).hidden = n !== name;
   });
   if (name === "gallery") loadGallery();
   if (name === "train") loadTrain();
+  if (name === "characters") loadCharacters();
 }
-["create","gallery","train"].forEach(n => $("#tab-"+n).onclick = () => showTab(n));
+const TABS = ["create","characters","scene","gallery","train"];
+TABS.forEach(n => $("#tab-"+n).onclick = () => showTab(n));
 
 // ---------- status
 let lastStatus = "", statusTimer = null;
@@ -448,7 +620,7 @@ async function pollStatus(){
     statusTimer = setTimeout(pollStatus, 4000);
   }
 }
-function updateGo(){ $("#go").disabled = !ready || busy; }
+function updateGo(){ $("#go").disabled = !ready || busy; $("#sc-go").disabled = !ready || busy || !scBox; }
 
 // ---------- models (Create)
 async function loadModels(){
@@ -456,6 +628,9 @@ async function loadModels(){
   const sel = $("#model"), cur = sel.value || store.get("model", "");
   sel.innerHTML = '<option value="">Standard</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join("");
   sel.value = models.some(m => m.slug === cur) ? cur : "";
+  const scs = $("#sc-model"), scCur = scs.value || store.get("scmodel", "");
+  scs.innerHTML = '<option value="">Standard</option>' + models.map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join("");
+  scs.value = models.some(m => m.slug === scCur) ? scCur : "";
   modelChanged();
   renderModelList();
 }
@@ -472,12 +647,13 @@ const showStrength = () => { $("#strength-v").textContent = Number(strength.valu
 strength.oninput = showStrength; showStrength();
 
 // ---------- generate
-function makeCard(shapeName){
+const ratioOf = job => job.kind === "scene" ? (job.ratio || "1 / 1") : SHAPE_RATIO[job.shape] || "1 / 1";
+function makeCard(job, grid){
   const c = document.createElement("article");
   c.className = "card busy";
-  c.innerHTML = `<div class="pic" style="aspect-ratio:${SHAPE_RATIO[shapeName]}">Up next…</div><div class="meta"><div class="p"></div></div>`;
-  $("#grid").prepend(c);
-  $("#empty").hidden = true;
+  c.innerHTML = `<div class="pic" style="aspect-ratio:${ratioOf(job)}">Up next…</div><div class="meta"><div class="p"></div></div>`;
+  (grid || $("#grid")).prepend(c);
+  if (!grid) $("#empty").hidden = true;
   return c;
 }
 function fillCard(c, rec){
@@ -492,29 +668,40 @@ function fillCard(c, rec){
       <a href="${imgURL(rec.file)}" download="${esc(rec.file)}">Download</a>
       <button data-a="del" class="del" aria-label="Delete this picture">Delete</button>
       <span class="secs">${rec.seconds}s</span></div>`;
-  meta.querySelector(".p").textContent = rec.prompt + (STYLE_NAMES[rec.style] ? " · " + STYLE_NAMES[rec.style] : "") + (rec.model_name ? " · " + rec.model_name : "");
-  meta.querySelector('[data-a="more"]').onclick = () => run(jobFrom(rec), Number(count.get()));
+  meta.querySelector(".p").textContent = (rec.scene ? "Scene: " : "") + rec.prompt + (rec.outfit_name ? " · " + rec.outfit_name : "") + (STYLE_NAMES[rec.style] ? " · " + STYLE_NAMES[rec.style] : "") + (rec.model_name ? " · " + rec.model_name : "");
+  meta.querySelector('[data-a="more"]').onclick = () => rec.scene ? runJobs([jobFrom(rec)], $("#sc-grid")) : run(jobFrom(rec), Number(count.get()));
   meta.querySelector('[data-a="reuse"]').onclick = () => reuse(rec);
   meta.querySelector('[data-a="del"]').onclick = () => deletePictures([rec.file]);
 }
-const jobFrom = rec => ({prompt: rec.prompt, style: rec.style, shape: rec.shape, model: rec.model || "", strength: rec.strength ?? 1});
-function currentJob(){ return {prompt: promptBox.value, style: style.get(), shape: shape.get(), model: $("#model").value, strength: Number(strength.value)}; }
+const jobFrom = rec => rec.scene
+  ? {kind: "scene", bg_file: rec.scene.bg, box: rec.scene.box, ratio: `${rec.w} / ${rec.h}`, prompt: rec.prompt, style: rec.style,
+     model: rec.model || "", strength: rec.strength ?? 1, outfit: rec.outfit || "", outfit_name: rec.outfit_name || ""}
+  : {prompt: rec.prompt, style: rec.style, shape: rec.shape, model: rec.model || "", strength: rec.strength ?? 1,
+     outfit: rec.outfit || "", outfit_name: rec.outfit_name || ""};
+function currentJob(){ const o = outfitOf("#outfit"); return {prompt: promptBox.value, style: style.get(), shape: shape.get(), model: $("#model").value, strength: Number(strength.value), outfit: o.text, outfit_name: o.name}; }
 
-async function run(job, n){
-  if (!ready || busy) { if (!ready) toast($("#status-text").textContent, true); return; }
-  if (!job.prompt.trim()){ toast("Type an idea first.", true); promptBox.focus(); return; }
+const run = (job, n) => runJobs(Array.from({length: n}, () => ({...job})));
+async function runJobs(jobs, grid){
+  if (!ready || busy) { toast(busy ? "Wait for the current pictures to finish." : $("#status-text").textContent, true); return []; }
+  if (!jobs.length || !jobs[0].prompt.trim()){ toast("Type an idea first.", true); return []; }
   busy = true; stopAsked = false; updateGo();
+  const n = jobs.length, recs = [];
   $("#stop").hidden = n < 2;
-  const cards = Array.from({length:n}, () => makeCard(job.shape)).reverse();
+  const cards = jobs.map(j => makeCard(j, grid)).reverse();
   for (let i = 0; i < n; i++){
-    const c = cards[i];
+    const c = cards[i], job = jobs[i];
     if (stopAsked){ c.remove(); continue; }
     c.querySelector(".pic").textContent = n > 1 ? `Painting ${i+1} of ${n}…` : "Painting…";
-    try { fillCard(c, await api("/api/generate", job)); }
+    try {
+      const rec = await api(job.kind === "scene" ? "/api/scene" : "/api/generate", job);
+      fillCard(c, rec); recs.push(rec);
+      if (job.kind === "scene" && !job.bg_file) jobs.forEach(j => { j.bg_file = rec.scene.bg; delete j.bg_data; });
+    }
     catch (e){ c.className = "card failed"; c.querySelector(".pic").textContent = e.message; toast(e.message, true); }
   }
   busy = false; $("#stop").hidden = true; updateGo();
   if (!$("#grid").children.length) $("#empty").hidden = false;
+  return recs;
 }
 $("#go").onclick = () => run(currentJob(), Number(count.get()));
 $("#stop").onclick = () => { stopAsked = true; $("#stop").hidden = true; toast("Stopping after the current picture."); };
@@ -527,6 +714,7 @@ function reuse(rec){
   if (rec.model && models.some(m => m.slug === rec.model)) { $("#model").value = rec.model; if (rec.strength) { strength.value = rec.strength; showStrength(); } }
   else $("#model").value = "";
   modelChanged();
+  selectOutfitByText("#outfit", rec.outfit, rec.outfit_name);
   promptBox.focus(); toast("Prompt loaded. Change anything, then Generate.");
 }
 
@@ -569,7 +757,7 @@ function togglePick(b){
   b.setAttribute("aria-pressed", String(picked.has(f)));
   updateSelBar();
 }
-function updateSelBar(){ $("#gsel-count").textContent = `${picked.size} selected`; $("#gsel-del").disabled = picked.size === 0; }
+function updateSelBar(){ $("#gsel-count").textContent = `${picked.size} selected`; $("#gsel-del").disabled = picked.size === 0; $("#gsel-train").disabled = picked.size === 0; }
 function enterSelect(){ selecting = true; picked.clear(); $("#gpane").classList.add("selecting"); $("#gbar-normal").hidden = true; $("#gbar-select").hidden = false; updateSelBar(); loadGallery(); }
 function exitSelect(){ selecting = false; picked.clear(); $("#gpane").classList.remove("selecting"); $("#gbar-normal").hidden = false; $("#gbar-select").hidden = true; document.querySelectorAll(".thumb").forEach(t => t.setAttribute("aria-pressed","false")); }
 $("#gselect").onclick = enterSelect;
@@ -598,7 +786,8 @@ function closeLB(){ if ($("#lb").hidden) return; $("#lb").hidden = true; if (las
 $("#lb-close").onclick = closeLB;
 $("#lb").addEventListener("click", e => { if (e.target.id === "lb" || e.target.classList.contains("stage")) closeLB(); });
 $("#lb-reuse").onclick = () => reuse(lbItem);
-$("#lb-more").onclick = () => { const r = lbItem; closeLB(); showTab("create"); run(jobFrom(r), Number(count.get())); };
+$("#lb-more").onclick = () => { const r = lbItem; closeLB();
+  if (r.scene) { showTab("scene"); runJobs([jobFrom(r)], $("#sc-grid")); } else { showTab("create"); run(jobFrom(r), Number(count.get())); } };
 $("#lb-del").onclick = () => deletePictures([lbItem.file]);
 
 // ---------- modals
@@ -863,7 +1052,257 @@ async function checkTraining(){
   }
 }
 
+// ======================= OUTFITS =======================
+let outfitsLib = [], tmpOutfits = {}, tmpN = 0, outfitTarget = null, outfitJob = null, outfitData = null;
+async function loadOutfits(){
+  try { outfitsLib = await getJSON("/api/outfits"); } catch { outfitsLib = []; }
+  document.querySelectorAll(".outfit-select").forEach(sel => {
+    const cur = sel.value, first = sel.dataset.f === "outfitlib" ? "(choose one)" : "None";
+    sel.innerHTML = `<option value="">${first}</option>` +
+      Object.entries(tmpOutfits).map(([k, o]) => `<option value="${k}">${esc(o.name)}</option>`).join("") +
+      outfitsLib.map(o => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("");
+    sel.value = [...sel.options].some(op => op.value === cur) ? cur : "";
+  });
+  showOutfitText();
+  renderOutfitGrid();
+}
+function outfitOf(sel){
+  const v = typeof sel === "string" ? $(sel).value : sel.value;
+  if (!v) return {text: "", name: ""};
+  if (tmpOutfits[v]) return tmpOutfits[v];
+  const o = outfitsLib.find(x => x.id === v);
+  return o ? {text: o.text, name: o.name} : {text: "", name: ""};
+}
+function selectOutfitByText(sel, text, name){
+  const s = $(sel); if (!text){ s.value = ""; showOutfitText(); return; }
+  const lib = outfitsLib.find(o => o.text === text);
+  if (lib) s.value = lib.id;
+  else { const k = "tmp" + (++tmpN); tmpOutfits[k] = {text, name: name || "Outfit (unsaved)"}; loadOutfits().then(() => { s.value = k; showOutfitText(); }); return; }
+  showOutfitText();
+}
+function showOutfitText(){
+  const o = outfitOf("#outfit");
+  $("#outfit-text").hidden = !o.text; $("#outfit-text").textContent = o.text ? "wearing " + o.text : "";
+}
+$("#outfit").onchange = showOutfitText;
+function renderOutfitGrid(){
+  const g = $("#mo-grid"); g.innerHTML = "";
+  $("#mo-lib").hidden = !outfitsLib.length;
+  for (const o of outfitsLib){
+    const d = document.createElement("div"); d.className = "ocard";
+    d.innerHTML = (o.thumb ? `<img alt="">` : `<div class="noimg"></div>`) + `<b></b><small></small>
+      <div class="actions"><button data-a="use">Use</button><button data-a="del" class="del">Delete</button></div>`;
+    if (o.thumb) d.querySelector("img").src = "/outfit-thumbs/" + encodeURIComponent(o.thumb);
+    d.querySelector("b").textContent = o.name; d.querySelector("small").textContent = o.text;
+    d.querySelector('[data-a="use"]').onclick = () => { if (outfitTarget) { outfitTarget.value = o.id; outfitTarget.dispatchEvent(new Event("change")); } showOutfitText(); closeModal("#m-outfit"); };
+    d.querySelector('[data-a="del"]').onclick = async () => {
+      if (!confirm(`Delete the outfit “${o.name}”?`)) return;
+      try { await api(`/api/outfits/${o.id}/delete`); loadOutfits(); } catch (e){ toast(e.message, true); }
+    };
+    g.appendChild(d);
+  }
+}
+document.querySelectorAll("[data-copy-outfit]").forEach(b => b.onclick = () => {
+  outfitTarget = b.parentElement.querySelector("select");
+  outfitData = null; outfitJob = null;
+  ["#mo-img","#mo-wait","#mo-err","#mo-result","#mo-once","#mo-save"].forEach(id => $(id).hidden = true);
+  $("#mo-pick").hidden = false; $("#mo-text").value = ""; $("#mo-name").value = "";
+  renderOutfitGrid(); openModal("#m-outfit");
+});
+$("#mo-choose").onclick = () => $("#mo-file").click();
+$("#mo-file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { outfitData = await fileToDataURL(f, 1280); } catch (err){ toast(err.message, true); return; }
+  $("#mo-img").src = outfitData; $("#mo-img").hidden = false; $("#mo-pick").hidden = true; $("#mo-err").hidden = true;
+  $("#mo-wait").hidden = false; $("#mo-msg").textContent = "Starting the picture reader…";
+  try {
+    const r = await api("/api/outfits/read", {data: outfitData});
+    outfitJob = r.job; pollStatus(); pollOutfit();
+  } catch (err){ $("#mo-wait").hidden = true; $("#mo-err").textContent = err.message; $("#mo-err").hidden = false; $("#mo-pick").hidden = false; }
+};
+async function pollOutfit(){
+  if (!outfitJob) return;
+  let j; try { j = await getJSON(`/api/outfits/read/${outfitJob}`); } catch { setTimeout(pollOutfit, 2000); return; }
+  if (j.status === "running"){ $("#mo-msg").textContent = j.message; setTimeout(pollOutfit, 1200); return; }
+  $("#mo-wait").hidden = true; pollStatus();
+  if (j.status === "done"){
+    $("#mo-text").value = j.text; $("#mo-result").hidden = false; $("#mo-once").hidden = false; $("#mo-save").hidden = false; $("#mo-name").focus();
+  } else { $("#mo-err").textContent = j.message; $("#mo-err").hidden = false; $("#mo-pick").hidden = false; }
+}
+$("#mo-once").onclick = async () => {
+  const text = $("#mo-text").value.trim(); if (!text) return toast("The description is empty.", true);
+  const k = "tmp" + (++tmpN); tmpOutfits[k] = {text, name: ($("#mo-name").value.trim() || "Outfit") + " (unsaved)"};
+  await loadOutfits(); if (outfitTarget) { outfitTarget.value = k; outfitTarget.dispatchEvent(new Event("change")); }
+  showOutfitText(); closeModal("#m-outfit");
+};
+$("#mo-save").onclick = async () => {
+  const text = $("#mo-text").value.trim(), name = $("#mo-name").value.trim();
+  if (!name) { toast("Give the outfit a name to save it.", true); $("#mo-name").focus(); return; }
+  try {
+    const r = await api("/api/outfits", {name, text, data: outfitData || ""});
+    await loadOutfits(); if (outfitTarget) { outfitTarget.value = r.id; outfitTarget.dispatchEvent(new Event("change")); }
+    showOutfitText(); closeModal("#m-outfit"); toast("Outfit saved to your library.");
+  } catch (e){ toast(e.message, true); }
+};
+
+// ======================= CHARACTERS =======================
+let chars = [], curChar = "";
+const cf = k => $(`#cform [data-f="${k}"]`);
+const POSES = ["full body, standing, front view, plain light background", "full body, side profile view, plain background",
+  "full body, back view, looking over the shoulder", "head and shoulders portrait, neutral expression, studio background",
+  "close-up portrait, warm smile, soft window light", "sitting on a wooden chair, three-quarter view",
+  "walking along a park path in the afternoon", "standing in a bright kitchen", "leaning against a brick wall on a city street",
+  "three-quarter view, arms crossed, studio background", "full body, walking on a beach at golden hour", "sitting at a cafe table, looking at the camera"];
+function charFields(){
+  const f = {};
+  document.querySelectorAll("#cform [data-f]").forEach(el => f[el.dataset.f] = el.type === "checkbox" ? (el.checked ? "1" : "") : el.value);
+  return f;
+}
+function setCharFields(f){
+  document.querySelectorAll("#cform [data-f]").forEach(el => {
+    const v = f[el.dataset.f]; if (v === undefined) return;
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+  });
+  charUI();
+}
+function charOutfit(f){
+  if (f.outfitstyle === "library") return outfitOf(cf("outfitlib")).text;
+  if (f.outfitstyle === "custom") return f.outfitcustom.trim();
+  return f.outfitstyle + (f.outfitcolors.trim() ? ` in ${f.outfitcolors.trim()}` : "");
+}
+function charLook(f){
+  const hair = (f.haircolor === "custom" ? (f.haircustom.trim() || "brown") : f.haircolor);
+  const parts = [`${f.gender === "nonbinary person" ? "a nonbinary person" : "a " + f.gender} in their ${f.age}`.replace("their", f.gender === "woman" ? "her" : f.gender === "man" ? "his" : "their"),
+    f.height, `${f.build} build`, `${f.face} face`, `${f.skin} skin`];
+  if (f.freckles) parts.push("freckles");
+  parts.push(`${f.eyes} eyes`, `${f.hairstyle} ${hair} hair` + (f.bangs !== "no bangs" ? ` with ${f.bangs}` : ""));
+  if (f.makeup !== "no makeup") parts.push(f.makeup);
+  if (f.glasses) parts.push("wearing glasses");
+  if (f.tattoos) parts.push("tattoos on the arms");
+  if (f.piercings) parts.push("ear piercings");
+  if (f.beard) parts.push("a beard");
+  const o = charOutfit(f); if (o) parts.push("wearing " + o);
+  return parts.join(", ");
+}
+function charPrompt(f, pose){
+  const scene = [pose || f.pose, f.setting.trim() ? "in " + f.setting.trim().replace(/^in /i, "") : "", f.lighting, f.extra.trim()].filter(Boolean);
+  return charLook(f) + ", " + scene.join(", ");
+}
+function charUI(){
+  const f = charFields();
+  $("#c-custom-wrap").hidden = f.haircolor !== "custom";
+  $("#c-olib-wrap").hidden = f.outfitstyle !== "library";
+  $("#c-ocustom-wrap").hidden = f.outfitstyle !== "custom";
+  cf("outfitcolors").disabled = f.outfitstyle === "library" || f.outfitstyle === "custom";
+  $("#cprompt").textContent = charPrompt(f);
+}
+$("#cform").addEventListener("input", charUI); $("#cform").addEventListener("change", charUI);
+async function loadCharacters(){
+  await loadOutfits();
+  try { chars = await getJSON("/api/characters"); } catch { chars = []; }
+  const l = $("#clist"); l.innerHTML = chars.length ? "" : '<div class="note" style="margin:0">None saved yet.</div>';
+  for (const c of chars){
+    const b = document.createElement("button"); b.className = "item"; b.setAttribute("aria-current", String(c.id === curChar));
+    b.innerHTML = `<span class="t"><b></b><small></small></span>`;
+    b.querySelector("b").textContent = c.name; b.querySelector("small").textContent = `${c.fields.gender || ""}, ${c.fields.age || ""}`;
+    b.onclick = () => { curChar = c.id; setCharFields(c.fields); $("#cdel").hidden = false; loadCharacters(); };
+    l.appendChild(b);
+  }
+  charUI();
+}
+$("#cnew").onclick = () => {
+  curChar = "";
+  document.querySelectorAll("#cform input[type=text]").forEach(i => i.value = "");
+  document.querySelectorAll("#cform input[type=checkbox]").forEach(i => i.checked = false);
+  document.querySelectorAll("#cform select").forEach(sel => { const d = [...sel.options].find(o => o.defaultSelected) || sel.options[0]; sel.value = d ? d.value : ""; });
+  $("#cdel").hidden = true; loadCharacters(); cf("name").focus();
+};
+$("#csave").onclick = async () => {
+  const f = charFields(); if (!f.name.trim()) { toast("Give the character a name first.", true); cf("name").focus(); return; }
+  try { const r = await api("/api/characters", {id: curChar, name: f.name, fields: f, prompt: charPrompt(f)}); curChar = r.id; $("#cdel").hidden = false; toast("Character saved."); loadCharacters(); }
+  catch (e){ toast(e.message, true); }
+};
+$("#cdel").onclick = async () => {
+  if (!curChar || !confirm("Delete this character card? Pictures you made stay in the Gallery.")) return;
+  try { await api(`/api/characters/${curChar}/delete`); curChar = ""; $("#cdel").hidden = true; $("#cnew").click(); toast("Character deleted."); } catch (e){ toast(e.message, true); }
+};
+function charJob(pose){ const f = charFields(); return {prompt: charPrompt(f, pose), style: f.style, shape: f.shape, model: "", strength: 1, outfit: "", outfit_name: ""}; }
+$("#cto").onclick = () => { const j = charJob(); showTab("create"); promptBox.value = j.prompt; store.set("prompt", j.prompt); style.set(j.style); shape.set(j.shape); $("#model").value = ""; modelChanged(); $("#outfit").value = ""; showOutfitText(); toast("Character sent to Create."); };
+$("#cgen").onclick = () => { showTab("create"); run(charJob(), Number(count.get())); };
+$("#cset").onclick = async () => {
+  if (!confirm("Make 12 pictures of this character in different poses and places? It takes a few minutes.")) return;
+  showTab("create");
+  const recs = await runJobs(POSES.map(p => ({...charJob(p), shape: "square"})));
+  if (recs.length) { toast(`Made ${recs.length}. Delete any that don't look like the same person, then add the rest to a training project.`); openAddTrain(recs.map(r => r.file), charFields().name); }
+};
+
+// ======================= ADD TO TRAINING PROJECT =======================
+let atFiles = [];
+async function openAddTrain(files, suggestName){
+  atFiles = files;
+  let projs = []; try { projs = await getJSON("/api/train/projects"); } catch {}
+  $("#at-proj").innerHTML = projs.map(p => `<option value="${esc(p.slug)}">${esc(p.name)} (${p.count})</option>`).join("") + '<option value="__new">+ New project…</option>';
+  if (!projs.length) $("#at-proj").value = "__new";
+  $("#at-name").value = suggestName || ""; $("#at-word").value = (suggestName || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) + (suggestName ? "x" : "");
+  $("#at-new").hidden = $("#at-proj").value !== "__new";
+  $("#at-count").textContent = `${files.length} picture${files.length === 1 ? "" : "s"} will be copied into the project. The originals stay in your Gallery.`;
+  openModal("#m-addtrain");
+}
+$("#at-proj").onchange = () => $("#at-new").hidden = $("#at-proj").value !== "__new";
+$("#at-go").onclick = async () => {
+  try {
+    let slug = $("#at-proj").value;
+    if (slug === "__new") slug = (await api("/api/train/projects", {name: $("#at-name").value, word: $("#at-word").value})).slug;
+    const r = await api(`/api/train/projects/${slug}/from-gallery`, {files: atFiles});
+    closeModal("#m-addtrain"); exitSelect && selecting && exitSelect();
+    curSlug = slug; store.set("project", slug);
+    toast(`Added ${r.added} picture${r.added === 1 ? "" : "s"} to the project.`);
+  } catch (e){ toast(e.message, true); }
+};
+$("#gsel-train").onclick = () => openAddTrain([...picked], "");
+
+// ======================= SCENE =======================
+let scBox = null, scDraw = null, scData = null, scFile = "";
+$("#sc-pick").onclick = () => $("#sc-file").click();
+$("#sc-file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { scData = await fileToDataURL(f, 2048); } catch (err){ toast(err.message, true); return; }
+  scFile = ""; scBox = null;
+  $("#sc-img").src = scData; $("#sc-wrap").hidden = false; $("#sc-empty").hidden = true; $("#sc-clear").hidden = true;
+  drawScBox(); updateGo();
+};
+const scWrap = $("#sc-wrap");
+function scRel(e){ const r = $("#sc-img").getBoundingClientRect(); return {x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))}; }
+scWrap.addEventListener("pointerdown", e => { if (e.button !== 0) return; scWrap.setPointerCapture(e.pointerId); const p = scRel(e); scDraw = {x0:p.x, y0:p.y, x1:p.x, y1:p.y}; drawScBox(); });
+scWrap.addEventListener("pointermove", e => { if (!scDraw) return; const p = scRel(e); scDraw.x1 = p.x; scDraw.y1 = p.y; drawScBox(); });
+scWrap.addEventListener("pointerup", () => {
+  if (!scDraw) return; const b = norm(scDraw); scDraw = null;
+  if (b.w >= 0.08 && b.h >= 0.08) scBox = b; else toast("Drag a bigger box where the character should go.", true);
+  drawScBox(); updateGo();
+});
+function drawScBox(){
+  scWrap.querySelectorAll(".box").forEach(b => b.remove());
+  const b = scDraw ? norm(scDraw) : scBox; if (!b) { $("#sc-clear").hidden = true; return; }
+  const el = document.createElement("div"); el.className = "box";
+  Object.assign(el.style, {left: b.x*100+"%", top: b.y*100+"%", width: b.w*100+"%", height: b.h*100+"%"});
+  if (!scDraw) el.innerHTML = "<span>here</span>";
+  scWrap.appendChild(el); $("#sc-clear").hidden = !scBox;
+}
+$("#sc-clear").onclick = () => { scBox = null; drawScBox(); updateGo(); };
+$("#sc-model").onchange = () => store.set("scmodel", $("#sc-model").value);
+$("#sc-go").onclick = async () => {
+  if (!scBox) return toast("Drag a box on the background first.", true);
+  const o = outfitOf("#sc-outfit"), im = $("#sc-img");
+  const job = {kind: "scene", box: scBox, ratio: `${im.naturalWidth} / ${im.naturalHeight}`, prompt: $("#sc-prompt").value,
+    style: $("#sc-style").value, model: $("#sc-model").value, strength: Number(strength.value), outfit: o.text, outfit_name: o.name};
+  if (scFile) job.bg_file = scFile; else job.bg_data = scData;
+  if (!job.prompt.trim()) { toast("Describe who or what goes in the box.", true); $("#sc-prompt").focus(); return; }
+  const recs = await runJobs([job], $("#sc-grid"));
+  if (recs[0]) scFile = recs[0].scene.bg;
+};
+
 loadModels();
+loadOutfits();
 pollStatus();
 </script>
 </body>
