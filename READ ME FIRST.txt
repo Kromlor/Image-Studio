@@ -19,7 +19,7 @@ SCREENS
            outfit...). Save it, make pictures, or make a 12-picture training set.
   Scene    Upload a background, drag a box, and put a character into it.
   Outfits  On Create or Scene, "Copy an outfit" reads the clothes in a picture
-           you upload and adds them to your prompt (one-time ~6 GB download).
+           you upload and adds them to your prompt (one-time ~17 GB download).
   Gallery  Everything you've made. Click a picture for details. "Select" lets
            you delete several at once or add them to a training project. Deleted pictures go to the Recycle Bin.
   Train    Teach the app your own character: new project > add 15-40 pictures

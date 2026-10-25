@@ -7,7 +7,6 @@ Usage: reader.py --image IN.png --out result.json
 import argparse
 import json
 import os
-import shutil
 import sys
 import traceback
 from pathlib import Path
@@ -18,10 +17,8 @@ os.environ.setdefault("HF_HOME", str(MODELS_DIR / "hf"))
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
-READER_DIR = MODELS_DIR / "outfit-reader"            # ready-to-use 4-bit copy lives here
-FULL_DIR = MODELS_DIR / "outfit-reader-download"     # temporary full download (fallback path only)
-PACKED_REPO = "unsloth/Qwen2.5-VL-7B-Instruct-unsloth-bnb-4bit"
-OFFICIAL_REPO = "Qwen/Qwen2.5-VL-7B-Instruct"
+READER_DIR = MODELS_DIR / "outfit-reader-qwen"       # official weights, packed to 4-bit on the card as they load
+REPO = "Qwen/Qwen2.5-VL-7B-Instruct"
 FAKE = os.environ.get("IMAGE_STUDIO_FAKE") == "1"
 
 PROMPT = (
@@ -44,32 +41,13 @@ def status(path: Path, **kw):
 
 
 def ensure_model(stat):
-    if (READER_DIR / "config.json").exists():
+    if (READER_DIR / ".download-complete").exists():
         return
     from huggingface_hub import snapshot_download
-    try:
-        stat(phase="download", message="One time: downloading the picture reader (about 6 GB)…")
-        snapshot_download(PACKED_REPO, local_dir=str(READER_DIR))
-        if (READER_DIR / "config.json").exists():
-            return
-    except Exception:
-        print("Packed reader download failed, trying the official one:\n" + traceback.format_exc(), flush=True)
-        shutil.rmtree(READER_DIR, ignore_errors=True)
-
-    # Fallback: official weights, pack to 4-bit ourselves, keep only the packed copy.
-    import torch
-    from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
-    stat(phase="download", message="One time: downloading the picture reader (about 17 GB, then packed to 6 GB)…")
-    snapshot_download(OFFICIAL_REPO, local_dir=str(FULL_DIR))
-    stat(phase="pack", message="One time: packing the picture reader…")
-    q = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16,
-                           llm_int8_skip_modules=["visual", "lm_head"])
-    model = AutoModelForImageTextToText.from_pretrained(str(FULL_DIR), quantization_config=q,
-                                                        dtype=torch.bfloat16, device_map="cuda:0")
-    model.save_pretrained(str(READER_DIR))
-    AutoProcessor.from_pretrained(str(FULL_DIR)).save_pretrained(str(READER_DIR))
-    del model
-    shutil.rmtree(FULL_DIR, ignore_errors=True)
+    stat(phase="download", message="One time: downloading the picture reader (about 17 GB)…")
+    snapshot_download(REPO, local_dir=str(READER_DIR),
+                      allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model", "*.jinja", "LICENSE*"])
+    (READER_DIR / ".download-complete").write_text("ok", encoding="utf-8")
 
 
 def read_outfit(image_path: Path, stat) -> str:
@@ -85,8 +63,13 @@ def read_outfit(image_path: Path, stat) -> str:
         raise RuntimeError("CUDA not available")
     ensure_model(stat)
     stat(phase="load", message="Loading the picture reader…")
+    from transformers import BitsAndBytesConfig
     processor = AutoProcessor.from_pretrained(str(READER_DIR), min_pixels=256 * 28 * 28, max_pixels=1024 * 28 * 28)
-    model = AutoModelForImageTextToText.from_pretrained(str(READER_DIR), dtype=torch.bfloat16, device_map="cuda:0")
+    # Only the language part is packed to 4-bit; the image-reading part stays full precision.
+    q = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16,
+                           llm_int8_skip_modules=["visual", "lm_head"])
+    model = AutoModelForImageTextToText.from_pretrained(str(READER_DIR), quantization_config=q,
+                                                        dtype=torch.bfloat16, device_map="cuda:0")
     model.eval()
 
     stat(phase="read", message="Reading the outfit…")
